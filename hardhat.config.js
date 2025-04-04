@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-ethers");
 require("dotenv").config();
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -20,6 +21,10 @@ module.exports = {
       url: "https://zetachain-athens-evm.blockpi.network/v1/rpc/public",
       accounts: [PRIVATE_KEY],
       chainId: 7001,
+      gasPrice: "auto",
+      gas: "auto",
+      timeout: 60000,
+      ens: false  // Boris: Disable ENS resolution
     },
     // Boris: Are networks below really required?
     // Ethereum Sepolia testnet

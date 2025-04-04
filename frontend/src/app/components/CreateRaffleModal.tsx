@@ -1,23 +1,26 @@
-'use client';
-
 import { useState } from 'react';
-import { useWriteContract, useSimulateContract, useAccount, useChainId } from 'wagmi';
+import { useWriteContract, useAccount, useChainId } from 'wagmi';
 import { ZetaRaffleABI } from '../contracts/abis';
 import { contractAddresses } from '../contracts/addresses';
 import { appConfig } from '../config';
 
-
 interface CreateRaffleModalProps {
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export function CreateRaffleModal({ onClose }: CreateRaffleModalProps) {
+export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps) {
   const { address } = useAccount();
   const chainId = useChainId();
   
+  // Form fields
   const [name, setName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [duration, setDuration] = useState<string>('7');
+  const [minimumDeposit, setMinimumDeposit] = useState<string>('10');
+  const [maxParticipants, setMaxParticipants] = useState<string>('100');
+  
+  // UI state
   const [processing, setProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -29,19 +32,6 @@ export function CreateRaffleModal({ onClose }: CreateRaffleModalProps) {
   const contractAddress = isZetaChain 
     ? (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffle as `0x${string}`
     : undefined;
-  
-  // Simulate contract call to check for errors
-  const { data: simulateData, isError: isSimulateError, error: simulateError } = useSimulateContract({
-    address: contractAddress,
-    abi: ZetaRaffleABI,
-    functionName: 'createRaffle',
-    args: [name, description, BigInt(duration)],
-    chainId: appConfig.mainChain.id,
-    account: address,
-    query: {
-      enabled: isZetaChain && !!address && !!name && !!description && !!duration,
-    },
-  });
   
   // Write contract function
   const { writeContractAsync: createRaffle } = useWriteContract();
@@ -64,7 +54,10 @@ export function CreateRaffleModal({ onClose }: CreateRaffleModalProps) {
     }
     
     try {
-      // Create raffle
+      // Note: Currently, the smart contract only supports the name, description, and duration parameters
+      // The minimumDeposit and maxParticipants will require contract modifications to be used
+      
+      // Create raffle - only using the parameters the current contract supports
       await createRaffle({
         address: contractAddress,
         abi: ZetaRaffleABI,
@@ -73,6 +66,11 @@ export function CreateRaffleModal({ onClose }: CreateRaffleModalProps) {
       });
       
       setSuccess(true);
+      
+      // Call onSuccess callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
       
       // Close modal after 2 seconds
       setTimeout(() => {
@@ -125,6 +123,7 @@ export function CreateRaffleModal({ onClose }: CreateRaffleModalProps) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 required
                 maxLength={50}
+                placeholder="Summer Giveaway"
               />
             </div>
             
@@ -139,6 +138,7 @@ export function CreateRaffleModal({ onClose }: CreateRaffleModalProps) {
                 required
                 rows={3}
                 maxLength={200}
+                placeholder="Enter a description for your raffle"
               />
             </div>
             
@@ -155,6 +155,41 @@ export function CreateRaffleModal({ onClose }: CreateRaffleModalProps) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 required
               />
+              <p className="text-sm text-gray-500 mt-1">How long the raffle will be open for entries</p>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Minimum Deposit (Tokens)
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={minimumDeposit}
+                onChange={(e) => setMinimumDeposit(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                disabled
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                <span className="text-yellow-600">Note:</span> Currently fixed at 10 tokens per ticket in the contract
+              </p>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Maximum Participants
+              </label>
+              <input
+                type="number"
+                min="2"
+                value={maxParticipants}
+                onChange={(e) => setMaxParticipants(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                disabled
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                <span className="text-yellow-600">Note:</span> This feature requires contract modification
+              </p>
             </div>
             
             {error && (

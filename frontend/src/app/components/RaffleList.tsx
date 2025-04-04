@@ -1,8 +1,5 @@
-'use client';
-
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useChainId } from 'wagmi';
-import { formatEther } from 'viem';
 import { RaffleCard } from './RaffleCard';
 import { RaffleInfo, RaffleState } from '../types';
 import { ZetaRaffleABI } from '../contracts/abis';
@@ -23,6 +20,12 @@ export function RaffleList({ userAddress }: RaffleListProps) {
   // Use the passed userAddress prop or fallback to the account from useAccount
   const effectiveAddress = userAddress || address || '';
 
+  // Get the ZetaRaffle contract address
+  const zetaRaffleAddress = (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffle as `0x${string}`;
+  
+  // Log the contract address to help with debugging
+  console.log("Using ZetaRaffle contract:", zetaRaffleAddress);
+
   // Get raffles
   const {
     data: rafflesData,
@@ -30,7 +33,7 @@ export function RaffleList({ userAddress }: RaffleListProps) {
     isLoading,
     refetch
   } = useReadContract({
-    address: (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffle as `0x${string}`,
+    address: zetaRaffleAddress,
     abi: ZetaRaffleABI,
     functionName: 'getAllRaffles',
     chainId: appConfig.mainChain.id,
@@ -48,15 +51,23 @@ export function RaffleList({ userAddress }: RaffleListProps) {
   // Process raffles data
   useEffect(() => {
     if (isError) {
+      console.error("Error fetching raffles:", isError);
       setError('Failed to load raffles. Please check your connection and try again.');
       setLoading(false);
       return;
     }
 
     if (!isLoading && rafflesData) {
-      setRaffles(rafflesData as RaffleInfo[]);
-      setLoading(false);
-      setError(null);
+      console.log("Received raffles data:", rafflesData);
+      try {
+        setRaffles(rafflesData as RaffleInfo[]);
+        setLoading(false);
+        setError(null);
+      } catch (err) {
+        console.error("Error processing raffles data:", err);
+        setError('Failed to process raffle data. Please try again later.');
+        setLoading(false);
+      }
     }
   }, [isLoading, isError, rafflesData]);
 
@@ -64,6 +75,7 @@ export function RaffleList({ userAddress }: RaffleListProps) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <p className="ml-4 text-indigo-500">Loading raffles...</p>
       </div>
     );
   }
@@ -73,6 +85,16 @@ export function RaffleList({ userAddress }: RaffleListProps) {
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
         <strong className="font-bold">Error: </strong>
         <span className="block sm:inline">{error}</span>
+        <button 
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            refetch();
+          }}
+          className="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-sm"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
@@ -86,28 +108,67 @@ export function RaffleList({ userAddress }: RaffleListProps) {
     );
   }
 
-  // Filter active raffles (OPEN state) first, then completed ones
+  // Filter active raffles (OPEN state) first, then drawing, then completed ones
   const activeRaffles = raffles.filter(raffle => raffle.state === RaffleState.OPEN);
   const drawingRaffles = raffles.filter(raffle => raffle.state === RaffleState.DRAWING);
   const completedRaffles = raffles.filter(raffle => raffle.state === RaffleState.COMPLETE);
 
   // Sort by end time (ascending for active, descending for completed)
-  activeRaffles.sort((a, b) => a.endTime - b.endTime);
-  completedRaffles.sort((a, b) => b.endTime - a.endTime);
+  activeRaffles.sort((a, b) => Number(a.endTime) - Number(b.endTime));
+  completedRaffles.sort((a, b) => Number(b.endTime) - Number(a.endTime));
 
   // Combine sorted arrays
   const sortedRaffles = [...activeRaffles, ...drawingRaffles, ...completedRaffles];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {sortedRaffles.map((raffle) => (
-        <RaffleCard
-          key={raffle.raffleId.toString()}
-          raffle={raffle}
-          userAddress={effectiveAddress}
-          onUpdate={() => refetch()}
-        />
-      ))}
+    <div>
+      {activeRaffles.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Active Raffles</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {activeRaffles.map((raffle) => (
+              <RaffleCard
+                key={raffle.raffleId.toString()}
+                raffle={raffle}
+                userAddress={effectiveAddress}
+                onUpdate={() => refetch()}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {drawingRaffles.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Drawing Raffles</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {drawingRaffles.map((raffle) => (
+              <RaffleCard
+                key={raffle.raffleId.toString()}
+                raffle={raffle}
+                userAddress={effectiveAddress}
+                onUpdate={() => refetch()}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {completedRaffles.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Completed Raffles</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {completedRaffles.map((raffle) => (
+              <RaffleCard
+                key={raffle.raffleId.toString()}
+                raffle={raffle}
+                userAddress={effectiveAddress}
+                onUpdate={() => refetch()}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ module.exports = {
       accounts: [PRIVATE_KEY],
       chainId: 7001,
     },
-    // NB: Are networks below really required?
+    // Boris: Are networks below really required?
     // Ethereum Sepolia testnet
     "sepolia": {
       url: "https://eth-sepolia.public.blastapi.io",

@@ -1,46 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
 import { Header } from './components/Header';
 import { ConnectWallet } from './components/ConnectWallet';
 import { RaffleList } from './components/RaffleList';
 import { CreateRaffleModal } from './components/CreateRaffleModal';
+import { useWalletConnection } from './hooks/useWalletConnection';
 
 export default function Home() {
   // Client-side rendering check
   const [mounted, setMounted] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   
-  // Client-side only state
-  const [isConnected, setIsConnected] = useState(false);
-  const [userAddress, setUserAddress] = useState<`0x${string}` | undefined>(undefined);
+  // Use our custom hook for wallet connection
+  const { isConnected, walletAddress, isLoading } = useWalletConnection();
   
-  // Hook into wagmi only on the client side
+  // Effect for client-side rendering
   useEffect(() => {
     setMounted(true);
-    
-    // Dynamically import and use wagmi
-    const getWalletInfo = async () => {
-      try {
-        const { useAccount } = await import('wagmi');
-        const { address, isConnected } = useAccount();
-        setIsConnected(isConnected);
-        setUserAddress(address);
-      } catch (error) {
-        console.error('Failed to load wallet info:', error);
-      }
-    };
-    
-    getWalletInfo();
-    
-    // Set up polling to check connection status
-    const interval = setInterval(getWalletInfo, 2000);
-    return () => clearInterval(interval);
   }, []);
   
   // During SSR or before client-side hydration, show a loading state
-  if (!mounted) {
+  if (!mounted || isLoading) {
     return (
       <main className="min-h-screen flex flex-col bg-gray-50">
         <Header />
@@ -74,8 +55,14 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Debug indicator */}
+        <div className="bg-gray-100 p-2 mb-4 text-sm">
+          Debug: Wallet {isConnected ? 'Connected' : 'Disconnected'} | 
+          Address: {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'None'}
+        </div>
+
         {isConnected ? (
-          <RaffleList userAddress={userAddress} />
+          <RaffleList userAddress={walletAddress} />
         ) : (
           <div className="text-center py-20">
             <h2 className="text-2xl font-semibold text-gray-700 mb-4">
@@ -90,7 +77,12 @@ export default function Home() {
       </div>
 
       {isCreateModalOpen && (
-        <CreateRaffleModal onClose={() => setIsCreateModalOpen(false)} />
+        <CreateRaffleModal 
+          onClose={() => setIsCreateModalOpen(false)} 
+          onSuccess={() => {
+            setIsCreateModalOpen(false);
+          }}
+        />
       )}
     </main>
   );

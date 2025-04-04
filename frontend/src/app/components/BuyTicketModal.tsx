@@ -1,12 +1,9 @@
-'use client';
-
 import { useState, useEffect } from 'react';
 import { 
   useAccount, 
   useChainId,
   useReadContract,
   useWriteContract, 
-  useSimulateContract,
   useSwitchChain
 } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
@@ -32,6 +29,10 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
   const [processing, setProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [isApproving, setIsApproving] = useState<boolean>(false);
+  
+  // Get contract addresses
+  const zetaRaffleAddress = (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffle as `0x${string}`;
   
   // Determine if user is on ZetaChain
   useEffect(() => {
@@ -44,33 +45,33 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
   
   // Calculate total price
   const ticketPrice = parseEther(appConfig.ticketPrice);
-  const totalPrice = ticketPrice * BigInt(ticketCount || '0');
+  const totalPrice = BigInt(ticketCount || '1') * ticketPrice;
   
   // Get ZRC20 token for selected chain (if on ZetaChain)
   const zrc20Address = isZetaChain 
-    ? (contractAddresses[appConfig.mainChain.id] as any).ZRC20Tokens[selectedChain] as `0x${string}`
+    ? (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any).ZRC20Tokens[selectedChain] as `0x${string}`
     : undefined;
   
   // Read token balance if on ZetaChain
-  const { data: tokenBalance } = useReadContract({
+  const { data: tokenBalance, refetch: refetchBalance } = useReadContract({
     address: zrc20Address,
     abi: ERC20ABI,
     functionName: 'balanceOf',
     args: [address as `0x${string}`],
     chainId: appConfig.mainChain.id,
     query: {
-    enabled: isZetaChain && !!address && !!zrc20Address,
+      enabled: isZetaChain && !!address && !!zrc20Address,
     }
   });
   
   // Read token allowance if on ZetaChain
-  const { data: tokenAllowance } = useReadContract({
+  const { data: tokenAllowance, refetch: refetchAllowance } = useReadContract({
     address: zrc20Address,
     abi: ERC20ABI,
     functionName: 'allowance',
     args: [
       address as `0x${string}`, 
-      (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any).ZetaRaffle as `0x${string}`
+      zetaRaffleAddress
     ],
     chainId: appConfig.mainChain.id,
     query: {
@@ -81,14 +82,42 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
   // Check if approval is needed
   const needsApproval = tokenAllowance !== undefined && tokenAllowance < totalPrice;
   
+  // Check if user has enough balance
+  const hasEnoughBalance = tokenBalance !== undefined && tokenBalance >= totalPrice;
+  
   // Handle approve token
   const { writeContractAsync: approveToken } = useWriteContract();
   
   // Handle buy tickets on ZetaChain
   const { writeContractAsync: buyTickets } = useWriteContract();
   
-  // Handle enter raffle on external chain
-  const { writeContractAsync: enterRaffle } = useWriteContract();
+  // Handle token approval
+  const handleApprove = async () => {
+    if (!zrc20Address || !address) return;
+    
+    setIsApproving(true);
+    setError(null);
+    
+    try {
+      await approveToken({
+        address: zrc20Address,
+        abi: ERC20ABI,
+        functionName: 'approve',
+        args: [
+          zetaRaffleAddress,
+          totalPrice
+        ],
+      });
+      
+      // Refetch allowance after approval
+      await refetchAllowance();
+    } catch (err: any) {
+      console.error('Error approving token:', err);
+      setError(`Failed to approve tokens: ${err.message}`);
+    } finally {
+      setIsApproving(false);
+    }
+  };
   
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,48 +126,73 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
     setError(null);
     
     try {
-      // Switch to the selected chain if needed
-      if (chainId !== selectedChain) {
-        await switchChain({ chainId: selectedChain });
-      }
-      
-      // Encode address as bytes
-      const encodedAddress = address as `0x${string}`;
-      
+      // First check if we're on ZetaChain
       if (isZetaChain) {
-        // If on ZetaChain, buy tickets directly
+        if (!zrc20Address) {
+          throw new Error("ZRC20 token address not found for the selected chain");
+        }
+        
+        if (!hasEnoughBalance) {
+          throw new Error(`Insufficient balance. You need at least ${formatEther(totalPrice)} tokens.`);
+        }
         
         // First approve if needed
         if (needsApproval) {
+          setIsApproving(true);
+          
           await approveToken({
-            address: zrc20Address as `0x${string}`,
+            address: zrc20Address,
             abi: ERC20ABI,
             functionName: 'approve',
             args: [
-              (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any).ZetaRaffle as `0x${string}`,
+              zetaRaffleAddress,
               totalPrice
             ],
           });
+          
+          // Refetch allowance after approval
+          await refetchAllowance();
+          setIsApproving(false);
         }
         
-        // Then buy tickets
+        // Encode address as bytes for external address
+        const encodedAddress = address as `0x${string}`;
+        
+        // Buy tickets
         await buyTickets({
-          address: (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any).ZetaRaffle as `0x${string}`,
+          address: zetaRaffleAddress,
           abi: ZetaRaffleABI,
           functionName: 'buyTickets',
           args: [
             BigInt(raffle.raffleId),
             BigInt(ticketCount),
             BigInt(selectedChain),
-            encodedAddress as `0x${string}`
+            encodedAddress
           ],
         });
       } else {
-        // If on external chain, use the connector
+        // If on external chain, need to switch to that chain first
+        if (chainId !== selectedChain) {
+          await switchChain({ chainId: selectedChain });
+        }
+        
+        // Get connector contract address for the current chain
         const connectorAddress = (contractAddresses[selectedChain as keyof typeof contractAddresses] as any)?.RaffleConnector as `0x${string}`;
+        
+        if (!connectorAddress || connectorAddress.includes('DEPLOYED_CONNECTOR_ADDRESS')) {
+          throw new Error(`Raffle connector not yet deployed on ${chainNames[selectedChain as keyof typeof chainNames] || 'this chain'}`);
+        }
+        
         const zetaTokenAddress = (contractAddresses[selectedChain as keyof typeof contractAddresses] as any)?.ZetaToken as `0x${string}`;
         
-        // First approve token if needed
+        if (!zetaTokenAddress) {
+          throw new Error("Zeta token address not found for the current chain");
+        }
+        
+        // Encode address as bytes
+        const encodedAddress = address as `0x${string}`;
+        
+        // First approve tokens
         await approveToken({
           address: zetaTokenAddress,
           abi: ERC20ABI,
@@ -147,7 +201,7 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
         });
         
         // Then enter raffle
-        await enterRaffle({
+        await buyTickets({
           address: connectorAddress,
           abi: RaffleConnectorABI,
           functionName: 'enterRaffle',
@@ -207,7 +261,7 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
                 type="text"
                 value={raffle.name}
                 disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
               />
             </div>
             
@@ -233,8 +287,19 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
                 type="text"
                 value={`${formatEther(totalPrice)} Tokens`}
                 disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
               />
+              
+              {isZetaChain && tokenBalance !== undefined && (
+                <p className="mt-1 text-sm text-gray-600">
+                  Your balance: {formatEther(tokenBalance)} Tokens
+                  {!hasEnoughBalance && (
+                    <span className="text-red-600 ml-2">
+                      (Insufficient balance)
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
             
             <div className="mb-4">
@@ -255,6 +320,28 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
               </select>
             </div>
             
+            {isZetaChain && needsApproval && (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={handleApprove}
+                  disabled={isApproving || !hasEnoughBalance}
+                  className={`w-full py-2 px-4 rounded ${
+                    isApproving 
+                      ? 'bg-yellow-400 cursor-not-allowed' 
+                      : !hasEnoughBalance 
+                      ? 'bg-gray-300 cursor-not-allowed' 
+                      : 'bg-yellow-500 hover:bg-yellow-600'
+                  } text-white font-bold`}
+                >
+                  {isApproving ? 'Approving...' : 'Approve Tokens First'}
+                </button>
+                <p className="mt-1 text-sm text-gray-600">
+                  You need to approve tokens before buying tickets.
+                </p>
+              </div>
+            )}
+            
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
                 <p className="font-bold">Error</p>
@@ -267,14 +354,18 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
                 type="button"
                 onClick={onClose}
                 className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded mr-2"
-                disabled={processing}
+                disabled={processing || isApproving}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
-                disabled={processing}
+                className={`bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded ${
+                  (processing || isApproving || (isZetaChain && needsApproval) || (isZetaChain && !hasEnoughBalance)) 
+                    ? 'opacity-50 cursor-not-allowed' 
+                    : ''
+                }`}
+                disabled={processing || isApproving || (isZetaChain && needsApproval) || (isZetaChain && !hasEnoughBalance)}
               >
                 {processing ? 'Processing...' : 'Buy Tickets'}
               </button>
@@ -283,5 +374,5 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
         )}
       </div>
     </div>
-  );
+  )
 }

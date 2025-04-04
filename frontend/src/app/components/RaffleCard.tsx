@@ -1,13 +1,11 @@
-'use client';
-
 import { useState } from 'react';
 import { formatEther } from 'viem';
-import { useReadContract } from 'wagmi';
+import { useReadContract, useWriteContract } from 'wagmi';
 import { RaffleInfo, RaffleState } from '../types';
 import { formatDistanceToNow } from '../utils/date';
 import { BuyTicketModal } from './BuyTicketModal';
 import { ZetaRaffleABI } from '../contracts/abis';
-import { contractAddresses } from '../contracts/addresses';
+import { contractAddresses, chainNames } from '../contracts/addresses';
 import { appConfig } from '../config';
 
 interface RaffleCardProps {
@@ -18,28 +16,39 @@ interface RaffleCardProps {
 
 export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
   
+  // Get ZetaRaffle contract address
+  const zetaRaffleAddress = (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffle as `0x${string}`;
+
   // Get user's ticket count
   const { data: ticketCount } = useReadContract({
-    address: (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffle as `0x${string}`,
+    address: zetaRaffleAddress,
     abi: ZetaRaffleABI,
     functionName: 'getTicketCount',
     args: [BigInt(raffle.raffleId), userAddress as `0x${string}`],
     chainId: appConfig.mainChain.id,
     query: {
-        enabled: !!userAddress,
+      enabled: !!userAddress,
     }
   });
 
-  // Format prize pool
-  const formattedPrizePool = formatEther(BigInt(raffle.prizePool));
+  // Setup claim prize function
+  const { writeContractAsync: claimPrize } = useWriteContract();
+
+  // Format prize pool (making sure we handle it as a BigInt)
+  const formattedPrizePool = typeof raffle.prizePool === 'string' 
+    ? formatEther(BigInt(raffle.prizePool)) 
+    : formatEther(raffle.prizePool as unknown as bigint);
   
   // Get time remaining
   const now = Math.floor(Date.now() / 1000);
-  const isEnded = now > raffle.endTime;
+  const endTime = typeof raffle.endTime === 'string' ? parseInt(raffle.endTime) : Number(raffle.endTime);
+  const isEnded = now > endTime;
   const timeRemaining = isEnded 
     ? 'Ended' 
-    : formatDistanceToNow(new Date(raffle.endTime * 1000));
+    : formatDistanceToNow(new Date(endTime * 1000));
   
   // Get status badge
   const getBadge = () => {
@@ -54,6 +63,31 @@ export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
         return <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">Completed</span>;
       default:
         return null;
+    }
+  };
+
+  // Handle claim prize
+  const handleClaimPrize = async () => {
+    if (!userAddress) return;
+    
+    setIsClaiming(true);
+    setClaimError(null);
+    
+    try {
+      await claimPrize({
+        address: zetaRaffleAddress,
+        abi: ZetaRaffleABI,
+        functionName: 'claimPrize',
+        args: [BigInt(raffle.raffleId)],
+      });
+      
+      // Update the raffle list
+      onUpdate();
+    } catch (err: any) {
+      console.error('Error claiming prize:', err);
+      setClaimError(err.message || 'Failed to claim prize. Please try again.');
+    } finally {
+      setIsClaiming(false);
     }
   };
 
@@ -77,10 +111,13 @@ export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
     if (raffle.state === RaffleState.COMPLETE && raffle.winner.toLowerCase() === userAddress.toLowerCase()) {
       return (
         <button
-          onClick={() => {/* Handle claim prize */}}
-          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg w-full"
+          onClick={handleClaimPrize}
+          disabled={isClaiming}
+          className={`${
+            isClaiming ? 'bg-green-400' : 'bg-green-600 hover:bg-green-700'
+          } text-white font-bold py-2 px-4 rounded-lg w-full`}
         >
-          Claim Prize
+          {isClaiming ? 'Claiming...' : 'Claim Prize'}
         </button>
       );
     }
@@ -108,7 +145,7 @@ export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
           
           <div className="flex justify-between">
             <span className="text-gray-500 text-sm">Entries:</span>
-            <span className="font-medium">{raffle.totalTickets}</span>
+            <span className="font-medium">{raffle.totalTickets.toString()}</span>
           </div>
           
           <div className="flex justify-between">
@@ -124,10 +161,18 @@ export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
           {raffle.state === RaffleState.COMPLETE && (
             <div className="flex justify-between">
               <span className="text-gray-500 text-sm">Winner:</span>
-              <span className="font-medium truncate w-24">{raffle.winner.slice(0, 6)}...{raffle.winner.slice(-4)}</span>
+              <span className="font-medium truncate ml-2 w-24">
+                {raffle.winner.slice(0, 6)}...{raffle.winner.slice(-4)}
+              </span>
             </div>
           )}
         </div>
+        
+        {claimError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-4 text-sm">
+            {claimError}
+          </div>
+        )}
         
         {getActionButton()}
       </div>

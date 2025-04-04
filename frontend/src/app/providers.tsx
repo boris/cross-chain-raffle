@@ -31,7 +31,7 @@ export function Providers({ children }: PropsWithChildren) {
 
     // Create wagmi config
     return createConfig({
-      chains: supportedChains,
+      chains: supportedChains as [typeof supportedChains[0], ...typeof supportedChains],
       transports,
       connectors,
     });

@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./ZetaInterfaces.sol";
+import "./interfaces/ZetaInterfaces.sol";
 
 /**
  * @title ZetaRaffle
@@ -311,6 +311,7 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
      * @dev ZetaChain message receiver
      */
     function onZetaMessage(
+        // Boris: are the next two parameters correct?
         bytes32 messageHash,
         address zrc20,
         uint256 amount,

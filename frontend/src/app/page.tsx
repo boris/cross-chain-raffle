@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 // Boris: Are these components below correct?
-import { Header } from './components/Header';
+import { Header } from '@/app/components/Header';
 import { appConfig } from './config';
 
 export default function Home() {

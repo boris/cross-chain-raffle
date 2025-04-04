@@ -1,0 +1,287 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { 
+  useAccount, 
+  useChainId,
+  useReadContract,
+  useWriteContract, 
+  useSimulateContract,
+  useSwitchChain
+} from 'wagmi';
+import { parseEther, formatEther } from 'viem';
+import { RaffleInfo } from '../types';
+import { ZetaRaffleABI, RaffleConnectorABI, ERC20ABI } from '../contracts';
+import { contractAddresses, chainNames } from '../contracts/addresses';
+import { supportedChains, appConfig } from '../config';
+
+interface BuyTicketModalProps {
+  raffle: RaffleInfo;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalProps) {
+  const { address } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  
+  const [ticketCount, setTicketCount] = useState<string>('1');
+  const [selectedChain, setSelectedChain] = useState<number>(chainId);
+  const [isZetaChain, setIsZetaChain] = useState<boolean>(false);
+  const [processing, setProcessing] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<boolean>(false);
+  
+  // Determine if user is on ZetaChain
+  useEffect(() => {
+    setIsZetaChain(chainId === appConfig.mainChain.id);
+    // Default to current chain if supported
+    if (supportedChains.some(chain => chain.id === chainId)) {
+      setSelectedChain(chainId);
+    }
+  }, [chainId]);
+  
+  // Calculate total price
+  const ticketPrice = parseEther(appConfig.ticketPrice);
+  const totalPrice = ticketPrice * BigInt(ticketCount || '0');
+  
+  // Get ZRC20 token for selected chain (if on ZetaChain)
+  const zrc20Address = isZetaChain 
+    ? (contractAddresses[appConfig.mainChain.id] as any).ZRC20Tokens[selectedChain] as `0x${string}`
+    : undefined;
+  
+  // Read token balance if on ZetaChain
+  const { data: tokenBalance } = useReadContract({
+    address: zrc20Address,
+    abi: ERC20ABI,
+    functionName: 'balanceOf',
+    args: [address as `0x${string}`],
+    chainId: appConfig.mainChain.id,
+    query: {
+    enabled: isZetaChain && !!address && !!zrc20Address,
+    }
+  });
+  
+  // Read token allowance if on ZetaChain
+  const { data: tokenAllowance } = useReadContract({
+    address: zrc20Address,
+    abi: ERC20ABI,
+    functionName: 'allowance',
+    args: [
+      address as `0x${string}`, 
+      (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any).ZetaRaffle as `0x${string}`
+    ],
+    chainId: appConfig.mainChain.id,
+    query: {
+      enabled: isZetaChain && !!address && !!zrc20Address,
+    }
+  });
+  
+  // Check if approval is needed
+  const needsApproval = tokenAllowance !== undefined && tokenAllowance < totalPrice;
+  
+  // Handle approve token
+  const { writeContractAsync: approveToken } = useWriteContract();
+  
+  // Handle buy tickets on ZetaChain
+  const { writeContractAsync: buyTickets } = useWriteContract();
+  
+  // Handle enter raffle on external chain
+  const { writeContractAsync: enterRaffle } = useWriteContract();
+  
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProcessing(true);
+    setError(null);
+    
+    try {
+      // Switch to the selected chain if needed
+      if (chainId !== selectedChain) {
+        await switchChain({ chainId: selectedChain });
+      }
+      
+      // Encode address as bytes
+      const encodedAddress = address as `0x${string}`;
+      
+      if (isZetaChain) {
+        // If on ZetaChain, buy tickets directly
+        
+        // First approve if needed
+        if (needsApproval) {
+          await approveToken({
+            address: zrc20Address as `0x${string}`,
+            abi: ERC20ABI,
+            functionName: 'approve',
+            args: [
+              (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any).ZetaRaffle as `0x${string}`,
+              totalPrice
+            ],
+          });
+        }
+        
+        // Then buy tickets
+        await buyTickets({
+          address: (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any).ZetaRaffle as `0x${string}`,
+          abi: ZetaRaffleABI,
+          functionName: 'buyTickets',
+          args: [
+            BigInt(raffle.raffleId),
+            BigInt(ticketCount),
+            BigInt(selectedChain),
+            encodedAddress as `0x${string}`
+          ],
+        });
+      } else {
+        // If on external chain, use the connector
+        const connectorAddress = (contractAddresses[selectedChain as keyof typeof contractAddresses] as any)?.RaffleConnector as `0x${string}`;
+        const zetaTokenAddress = (contractAddresses[selectedChain as keyof typeof contractAddresses] as any)?.ZetaToken as `0x${string}`;
+        
+        // First approve token if needed
+        await approveToken({
+          address: zetaTokenAddress,
+          abi: ERC20ABI,
+          functionName: 'approve',
+          args: [connectorAddress, totalPrice],
+        });
+        
+        // Then enter raffle
+        await enterRaffle({
+          address: connectorAddress,
+          abi: RaffleConnectorABI,
+          functionName: 'enterRaffle',
+          args: [
+            BigInt(raffle.raffleId),
+            zetaTokenAddress,
+            totalPrice,
+            BigInt(selectedChain),
+            encodedAddress
+          ],
+        });
+      }
+      
+      setSuccess(true);
+      onSuccess();
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+      
+    } catch (err: any) {
+      console.error('Error buying tickets:', err);
+      setError(err.message || 'Failed to buy tickets. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-800">Buy Tickets</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        {success ? (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            <p className="font-bold">Success!</p>
+            <p>Your tickets have been purchased.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Raffle
+              </label>
+              <input
+                type="text"
+                value={raffle.name}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Number of Tickets
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={ticketCount}
+                onChange={(e) => setTicketCount(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                required
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Total Price
+              </label>
+              <input
+                type="text"
+                value={`${formatEther(totalPrice)} Tokens`}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Preferred Chain for Prizes
+              </label>
+              <select
+                value={selectedChain}
+                onChange={(e) => setSelectedChain(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                required
+              >
+                {supportedChains.map((chain) => (
+                  <option key={chain.id} value={chain.id}>
+                    {chainNames[chain.id as keyof typeof chainNames] || chain.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <p className="font-bold">Error</p>
+                <p>{error}</p>
+              </div>
+            )}
+            
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded mr-2"
+                disabled={processing}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
+                disabled={processing}
+              >
+                {processing ? 'Processing...' : 'Buy Tickets'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}

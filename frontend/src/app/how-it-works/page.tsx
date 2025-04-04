@@ -107,47 +107,6 @@ export default function HowItWorks() {
             </div>
           </div>
         </div>
-        
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-4">Technical Details</h2>
-          
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Cross-Chain Communication</h3>
-              <p className="mt-1 text-gray-600">
-                ZetaRaffle uses ZetaChain's cross-chain messaging to verify and transfer tokens between chains.
-                When you buy tickets from an external chain, your tokens are "locked" and represented as ZRC20 tokens
-                on ZetaChain.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Fair Randomness</h3>
-              <p className="mt-1 text-gray-600">
-                Winner selection is done using Pyth Entropy, a decentralized randomness service. This ensures
-                that the selection process is transparent, fair, and cannot be manipulated by anyone, including
-                the raffle creators.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Prize Distribution</h3>
-              <p className="mt-1 text-gray-600">
-                95% of the prize pool goes to the winner, while 5% is kept as a protocol fee to maintain the
-                platform. When claiming prizes, users can choose which chain they want to receive their winnings on.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Creating Raffles</h3>
-              <p className="mt-1 text-gray-600">
-                Currently, only the platform owner can create new raffles. This is to ensure the quality and
-                legitimacy of raffles. Future versions will allow anyone to create raffles with different
-                parameters and token types.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </main>
   );

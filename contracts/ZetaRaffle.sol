@@ -351,6 +351,7 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
      * @dev ZetaChain revert message handler
      */
     function onZetaRevert(
+        // Boris: are `messageHash` and `calldata message` correct?
         bytes32 messageHash,
         address zrc20,
         uint256 amount,

@@ -1,7 +1,7 @@
 import { Inter } from 'next/font/google';
 import './globals.css';
-// Use the simplified providers to avoid ESM/CJS conflicts
-import { Providers } from './providers-simple';
+// Use the original providers with WagmiProvider
+import { Providers } from './providers';
 
 const inter = Inter({ subsets: ['latin'] });
 

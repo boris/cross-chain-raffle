@@ -9,12 +9,19 @@ import { ZetaRaffleABI } from '../contracts/abis';
 import { contractAddresses } from '../contracts/addresses';
 import { appConfig } from '../config';
 
-export function RaffleList() {
+interface RaffleListProps {
+  userAddress?: string;
+}
+
+export function RaffleList({ userAddress }: RaffleListProps) {
   const { address } = useAccount();
   const chainId = useChainId();
   const [raffles, setRaffles] = useState<RaffleInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Use the passed userAddress prop or fallback to the account from useAccount
+  const effectiveAddress = userAddress || address || '';
 
   // Get raffles
   const {
@@ -97,7 +104,7 @@ export function RaffleList() {
         <RaffleCard
           key={raffle.raffleId.toString()}
           raffle={raffle}
-          userAddress={address || ''}
+          userAddress={effectiveAddress}
           onUpdate={() => refetch()}
         />
       ))}

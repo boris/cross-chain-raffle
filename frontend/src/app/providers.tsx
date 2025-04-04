@@ -1,11 +1,41 @@
 'use client';
 
 import { PropsWithChildren, useEffect, useState } from 'react';
-import { supportedChains, defaultProviderOptions } from './config';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { supportedChains, appConfig } from './config';
+import { WagmiProvider, createConfig, http } from 'wagmi';
+import { RainbowKitProvider, getDefaultWallets } from '@rainbow-me/rainbowkit';
+import '@rainbow-me/rainbowkit/styles.css';
 
 // Create a client-side only wrapper component
 export function Providers({ children }: PropsWithChildren) {
   const [mounted, setMounted] = useState(false);
+  const [client] = useState(() => new QueryClient());
+  const [config] = useState(() => {
+    // Get project ID from env or use a placeholder
+    const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || 'placeholder_project_id';
+
+    // Set up connectors
+    const { connectors } = getDefaultWallets({
+      appName: appConfig.appName,
+      projectId,
+    });
+
+    // Create transports config for each chain
+    const transports = Object.fromEntries(
+      supportedChains.map(chain => [
+        chain.id,
+        http(chain.rpcUrls.default.http[0])
+      ])
+    );
+
+    // Create wagmi config
+    return createConfig({
+      chains: supportedChains,
+      transports,
+      connectors,
+    });
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -17,47 +47,13 @@ export function Providers({ children }: PropsWithChildren) {
   }
 
   // Client-side only component
-  return <ClientProviders>{children}</ClientProviders>;
-}
-
-// This component only renders on the client
-function ClientProviders({ children }: PropsWithChildren) {
-  // Dynamic imports to avoid SSR issues with browser APIs
-  const { WagmiConfig, createConfig } = require('wagmi');
-  const { http } = require('viem');
-  const { RainbowKitProvider, getDefaultWallets } = require('@rainbow-me/rainbowkit');
-  require('@rainbow-me/rainbowkit/styles.css');
-
-  // Get project ID from env or use a placeholder
-  const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || 'YOUR_PROJECT_ID';
-
-  // Set up connectors - explicitly exclude Safe connector
-  const { connectors } = getDefaultWallets({
-    appName: defaultProviderOptions.appName,
-    projectId,
-    wallets: [], // Use default wallets without Safe
-  });
-
-  // Create transports config for each chain
-  const transports = Object.fromEntries(
-    supportedChains.map(chain => [
-      chain.id,
-      http(chain.rpcUrls.default.http[0])
-    ])
-  );
-
-  // Create wagmi config
-  const wagmiConfig = createConfig({
-    chains: supportedChains as [typeof supportedChains[0], ...typeof supportedChains],
-    transports,
-    connectors,
-  });
-
   return (
-    <WagmiConfig config={wagmiConfig}>
-      <RainbowKitProvider>
-        {children}
-      </RainbowKitProvider>
-    </WagmiConfig>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={client}>
+        <RainbowKitProvider>
+          {children}
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }

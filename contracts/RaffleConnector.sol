@@ -134,3 +134,4 @@ contract RaffleConnector is Ownable {
         IERC20 token = IERC20(tokenAddress);
         require(token.transfer(to, amount), "Token transfer failed");
     }
+}

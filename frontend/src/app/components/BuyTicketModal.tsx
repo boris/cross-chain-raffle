@@ -80,10 +80,10 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
   });
   
   // Check if approval is needed
-  const needsApproval = tokenAllowance !== undefined && tokenAllowance < totalPrice;
+  const needsApproval = typeof tokenAllowance === 'bigint' && tokenAllowance < totalPrice;
   
   // Check if user has enough balance
-  const hasEnoughBalance = tokenBalance !== undefined && tokenBalance >= totalPrice;
+  const hasEnoughBalance = typeof tokenBalance === 'bigint' && tokenBalance >= totalPrice;
   
   // Handle approve token
   const { writeContractAsync: approveToken } = useWriteContract();
@@ -292,7 +292,7 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
               
               {isZetaChain && tokenBalance !== undefined && (
                 <p className="mt-1 text-sm text-gray-600">
-                  Your balance: {formatEther(tokenBalance)} Tokens
+                  Your balance: {typeof tokenBalance === 'bigint' ? formatEther(tokenBalance) : '0'} Tokens
                   {!hasEnoughBalance && (
                     <span className="text-red-600 ml-2">
                       (Insufficient balance)

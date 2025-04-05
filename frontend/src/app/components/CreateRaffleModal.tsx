@@ -170,7 +170,7 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
               </label>
               <input
                 type="number"
-                min="1"
+                min="0.001"
                 value={minimumDeposit}
                 onChange={(e) => setMinimumDeposit(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"

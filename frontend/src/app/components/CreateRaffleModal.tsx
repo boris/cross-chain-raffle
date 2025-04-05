@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWriteContract, useAccount, useChainId } from 'wagmi';
-import { ZetaRaffleABI } from '../contracts/abis';
+import { ethers } from 'ethers';
+import { ZetaRaffleV2ABI } from '../contracts'; // Import from the main contracts index
 import { contractAddresses } from '../contracts/addresses';
 import { appConfig } from '../config';
 
@@ -17,8 +18,9 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
   const [name, setName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [duration, setDuration] = useState<string>('7');
-  const [minimumDeposit, setMinimumDeposit] = useState<string>('10');
+  const [minimumDeposit, setMinimumDeposit] = useState<string>('0.0001');
   const [maxParticipants, setMaxParticipants] = useState<string>('100');
+  const [useMaxParticipants, setUseMaxParticipants] = useState<boolean>(true);
   
   // UI state
   const [processing, setProcessing] = useState<boolean>(false);
@@ -30,11 +32,58 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
   
   // Get contract address
   const contractAddress = isZetaChain 
-    ? (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffle as `0x${string}`
+    ? (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffleV2 as `0x${string}`
     : undefined;
+    
+  const [contractExists, setContractExists] = useState<boolean>(false);
   
-  // Write contract function
-  const { writeContractAsync: createRaffle } = useWriteContract();
+  // Check if the contract exists at the provided address
+  useEffect(() => {
+    const checkContractExists = async () => {
+      if (!isZetaChain || !contractAddress) {
+        setContractExists(false);
+        return;
+      }
+      
+      try {
+        // Simple check using fetch to see if the address has code
+        if (window.ethereum) {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const code = await provider.getCode(contractAddress);
+          const exists = code !== '0x';
+          setContractExists(exists);
+          console.log(`Contract at ${contractAddress} exists: ${exists ? 'Yes' : 'No'}`);
+          
+          if (!exists) {
+            console.error("No contract code found at the specified address!");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check contract:", err);
+        setContractExists(false);
+      }
+    };
+    
+    checkContractExists();
+  }, [isZetaChain, contractAddress]);
+  
+  // Write contract function with more diagnostics
+  const { writeContractAsync: createRaffle, isPending, isError, error: contractError } = useWriteContract();
+  
+  // Log contract address for debugging
+  useEffect(() => {
+    if (isZetaChain && contractAddress) {
+      console.log("ZetaRaffleV2 contract address:", contractAddress);
+    }
+  }, [isZetaChain, contractAddress]);
+  
+  // Monitor for write contract errors
+  useEffect(() => {
+    if (isError && contractError) {
+      console.error("Contract write error:", contractError);
+      setError(contractError.message || "Transaction failed. Check console for details.");
+    }
+  }, [isError, contractError]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,15 +103,47 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
     }
     
     try {
-      // Note: Currently, the smart contract only supports the name, description, and duration parameters
-      // The minimumDeposit and maxParticipants will require contract modifications to be used
+      // Calculate max participants value and ensure it's a valid BigInt
+      let maxParticipantsValue;
+      try {
+        maxParticipantsValue = useMaxParticipants 
+          ? BigInt(parseInt(maxParticipants) || 100)  // Default to 100 if parsing fails
+          : BigInt(0); // 0 means unlimited
+      } catch (err) {
+        console.error("Error converting maxParticipants to BigInt:", err);
+        maxParticipantsValue = BigInt(0); // Fallback to unlimited
+      }
       
-      // Create raffle - only using the parameters the current contract supports
+      console.log("Creating raffle with params:", {
+        name,
+        description,
+        duration: BigInt(parseInt(duration) || 7), // Default to 7 days if parsing fails
+        maxParticipants: maxParticipantsValue
+      });
+      
+      // Validate inputs before sending transaction
+      if (!name || name.trim() === '') {
+        throw new Error("Raffle name cannot be empty");
+      }
+      
+      if (!description || description.trim() === '') {
+        throw new Error("Raffle description cannot be empty");
+      }
+      
+      // Create raffle with the new parameter and explicit gas settings
+      console.log("Calling contract at address:", contractAddress);
       await createRaffle({
         address: contractAddress,
-        abi: ZetaRaffleABI,
+        abi: ZetaRaffleV2ABI,
         functionName: 'createRaffle',
-        args: [name, description, BigInt(duration)],
+        args: [
+          name, 
+          description, 
+          BigInt(parseInt(duration) || 7),  // Default to 7 days if parsing fails
+          maxParticipantsValue
+        ],
+        // Add explicit gas settings
+        gas: BigInt(3000000), // Set a high gas limit to ensure transaction doesn't run out of gas
       });
       
       setSuccess(true);
@@ -79,7 +160,26 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
       
     } catch (err: any) {
       console.error('Error creating raffle:', err);
-      setError(err.message || 'Failed to create raffle. Please try again.');
+      // More detailed error logging
+      if (err.cause) {
+        console.error('Error cause:', err.cause);
+      }
+      if (err.stack) {
+        console.error('Error stack:', err.stack);
+      }
+      
+      // Provide a more helpful error message
+      let errorMessage = 'Failed to create raffle. Please try again.';
+      
+      if (err.message) {
+        if (err.message.includes('undefined') && err.message.includes('length')) {
+          errorMessage = 'Unable to process form data. Please check your inputs.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setProcessing(false);
     }
@@ -104,6 +204,11 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
           <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
             <p className="font-bold">Wrong Network</p>
             <p>You must be connected to ZetaChain to create a raffle.</p>
+          </div>
+        ) : !contractAddress ? (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p className="font-bold">Contract Not Configured</p>
+            <p>The ZetaRaffleV2 contract address is not set. Please check your configuration.</p>
           </div>
         ) : success ? (
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
@@ -160,35 +265,45 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
             
             <div className="mb-4">
               <label className="block text-gray-700 text-sm font-bold mb-2">
-                Minimum Deposit (Tokens)
+                Ticket Price
               </label>
               <input
-                type="number"
-                min="1"
+                type="text"
                 value={minimumDeposit}
-                onChange={(e) => setMinimumDeposit(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
                 disabled
               />
               <p className="text-sm text-gray-500 mt-1">
-                <span className="text-yellow-600">Note:</span> Currently fixed at 10 tokens per ticket in the contract
+                Fixed at 0.0001 tokens per ticket
               </p>
             </div>
             
             <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Maximum Participants
-              </label>
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="useMaxParticipants"
+                  checked={useMaxParticipants}
+                  onChange={(e) => setUseMaxParticipants(e.target.checked)}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="useMaxParticipants" className="ml-2 block text-gray-700 text-sm font-bold">
+                  Limit participants
+                </label>
+              </div>
+              
               <input
                 type="number"
                 min="2"
                 value={maxParticipants}
                 onChange={(e) => setMaxParticipants(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
-                disabled
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md ${!useMaxParticipants ? 'bg-gray-100' : ''}`}
+                disabled={!useMaxParticipants}
               />
               <p className="text-sm text-gray-500 mt-1">
-                <span className="text-yellow-600">Note:</span> This feature requires contract modification
+                {useMaxParticipants 
+                  ? `Maximum number of participants: ${maxParticipants}`
+                  : "No limit on participants"}
               </p>
             </div>
             

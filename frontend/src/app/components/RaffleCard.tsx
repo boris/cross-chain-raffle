@@ -137,36 +137,45 @@ export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
           {raffle.description}
         </p>
         
-        <div className="space-y-2 mb-4">
-          <div className="flex justify-between">
-            <span className="text-gray-500 text-sm">Prize Pool:</span>
-            <span className="font-medium">{parseFloat(formattedPrizePool).toFixed(2)} Tokens</span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-gray-500 text-sm">Entries:</span>
-            <span className="font-medium">{raffle.totalTickets.toString()}</span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-gray-500 text-sm">Your Tickets:</span>
-            <span className="font-medium">{ticketCount ? Number(ticketCount) : '0'}</span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-gray-500 text-sm">Time Remaining:</span>
-            <span className="font-medium">{timeRemaining}</span>
-          </div>
-          
-          {raffle.state === RaffleState.COMPLETE && (
-            <div className="flex justify-between">
-              <span className="text-gray-500 text-sm">Winner:</span>
-              <span className="font-medium truncate ml-2 w-24">
-                {raffle.winner.slice(0, 6)}...{raffle.winner.slice(-4)}
-              </span>
-            </div>
-          )}
-        </div>
+        // This is just the updated section of the RaffleCard component that shows the max participants
+
+<div className="space-y-2 mb-4">
+  <div className="flex justify-between">
+    <span className="text-gray-500 text-sm">Prize Pool:</span>
+    <span className="font-medium">{parseFloat(formattedPrizePool).toFixed(2)} Tokens</span>
+  </div>
+  
+  <div className="flex justify-between">
+    <span className="text-gray-500 text-sm">Entries:</span>
+    <span className="font-medium">{raffle.totalTickets.toString()}</span>
+  </div>
+  
+  {raffle.maxParticipants !== undefined && raffle.maxParticipants > 0 && (
+    <div className="flex justify-between">
+      <span className="text-gray-500 text-sm">Max Participants:</span>
+      <span className="font-medium">{raffle.maxParticipants.toString()}</span>
+    </div>
+  )}
+  
+  <div className="flex justify-between">
+    <span className="text-gray-500 text-sm">Your Tickets:</span>
+    <span className="font-medium">{ticketCount ? Number(ticketCount) : '0'}</span>
+  </div>
+  
+  <div className="flex justify-between">
+    <span className="text-gray-500 text-sm">Time Remaining:</span>
+    <span className="font-medium">{timeRemaining}</span>
+  </div>
+  
+  {raffle.state === RaffleState.COMPLETE && (
+    <div className="flex justify-between">
+      <span className="text-gray-500 text-sm">Winner:</span>
+      <span className="font-medium truncate ml-2 w-24">
+        {raffle.winner.slice(0, 6)}...{raffle.winner.slice(-4)}
+      </span>
+    </div>
+  )}
+</div>
         
         {claimError && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-4 text-sm">

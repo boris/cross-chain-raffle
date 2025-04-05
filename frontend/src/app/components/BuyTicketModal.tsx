@@ -8,7 +8,7 @@ import {
 } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { RaffleInfo } from '../types';
-import { ZetaRaffleABI, RaffleConnectorABI, ERC20ABI } from '../contracts';
+import { ZetaRaffleV2ABI, RaffleConnectorABI, ERC20ABI } from '../contracts';
 import { contractAddresses, chainNames } from '../contracts/addresses';
 import { supportedChains, appConfig } from '../config';
 
@@ -32,7 +32,7 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
   const [isApproving, setIsApproving] = useState<boolean>(false);
   
   // Get contract addresses
-  const zetaRaffleAddress = (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffle as `0x${string}`;
+  const zetaRaffleAddress = (contractAddresses[appConfig.mainChain.id as keyof typeof contractAddresses] as any)?.ZetaRaffleV2 as `0x${string}`;
   
   // Determine if user is on ZetaChain
   useEffect(() => {
@@ -43,7 +43,7 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
     }
   }, [chainId]);
   
-  // Calculate total price
+  // Calculate total price based on new ticket price
   const ticketPrice = parseEther(appConfig.ticketPrice);
   const totalPrice = BigInt(ticketCount || '1') * ticketPrice;
   
@@ -80,10 +80,10 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
   });
   
   // Check if approval is needed
-  const needsApproval = tokenAllowance !== undefined && tokenAllowance < totalPrice;
+  const needsApproval = typeof tokenAllowance === 'bigint' && tokenAllowance < totalPrice;
   
   // Check if user has enough balance
-  const hasEnoughBalance = tokenBalance !== undefined && tokenBalance >= totalPrice;
+  const hasEnoughBalance = typeof tokenBalance === 'bigint' && tokenBalance >= totalPrice;
   
   // Handle approve token
   const { writeContractAsync: approveToken } = useWriteContract();
@@ -161,7 +161,7 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
         // Buy tickets
         await buyTickets({
           address: zetaRaffleAddress,
-          abi: ZetaRaffleABI,
+          abi: ZetaRaffleV2ABI,
           functionName: 'buyTickets',
           args: [
             BigInt(raffle.raffleId),
@@ -290,9 +290,13 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
               />
               
+              <p className="mt-1 text-sm text-gray-600">
+                Price per ticket: {appConfig.ticketPrice} Tokens
+              </p>
+              
               {isZetaChain && tokenBalance !== undefined && (
                 <p className="mt-1 text-sm text-gray-600">
-                  Your balance: {formatEther(tokenBalance)} Tokens
+                  Your balance: {typeof tokenBalance === 'bigint' ? formatEther(tokenBalance) : '0'} Tokens
                   {!hasEnoughBalance && (
                     <span className="text-red-600 ml-2">
                       (Insufficient balance)
@@ -374,5 +378,5 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
         )}
       </div>
     </div>
-  )
+  );
 }

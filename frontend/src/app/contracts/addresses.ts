@@ -2,7 +2,8 @@
 type ChainId = 7001 | 11155111 | 97 | 80001;
 
 type ZetaChainContracts = {
-  ZetaRaffle: string;
+  ZetaRaffle: string;  // Original contract (kept for compatibility)
+  ZetaRaffleV2: string; // New V2 contract
   ZRC20Tokens: {
     [key: number]: string;
   };
@@ -17,7 +18,8 @@ type ExternalChainContracts = {
 export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalChainContracts> = {
   // ZetaChain testnet
   7001: {
-    ZetaRaffle: '0x31569c7d6232cbd335526f52160893ccc557faca',
+    ZetaRaffle: '0x31569c7d6232cbd335526f52160893ccc557faca', // Original contract
+    ZetaRaffleV2: '0xf5b7b9f42c4DAbaEAA146a74d19E95AB194d499e', // Will be updated after deployment
     // ZRC20 tokens
     ZRC20Tokens: {
       97: '0x13A0c5930C028511Dc02665E7285134B6d11A5f4', // BSC ZRC20
@@ -25,20 +27,18 @@ export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalCha
       80001: '0x6f1c648eb474d6c14caa0bbbbb472c03dc191e28', // Mumbai ZRC20
     }
   },
-  // Ethereum Sepolia testnet
+  // Add missing chain entries
   11155111: {
-    RaffleConnector: '0x_DEPLOYED_CONNECTOR_ADDRESS_SEPOLIA',
-    ZetaToken: '0x0000000000000000000000000000000000000000' // Replace with actual address
+    RaffleConnector: '0x0000000000000000000000000000000000000000',
+    ZetaToken: '0x0000000000000000000000000000000000000000'
   },
-  // BSC testnet
   97: {
-    RaffleConnector: '0x_DEPLOYED_CONNECTOR_ADDRESS_BSC',
-    ZetaToken: '0x0000000000000000000000000000000000000000' // Replace with actual address
+    RaffleConnector: '0x0000000000000000000000000000000000000000',
+    ZetaToken: '0x0000000000000000000000000000000000000000'
   },
-  // Polygon Mumbai testnet
   80001: {
-    RaffleConnector: '0x_DEPLOYED_CONNECTOR_ADDRESS_MUMBAI',
-    ZetaToken: '0x0000000000000000000000000000000000000000' // Replace with actual address
+    RaffleConnector: '0x0000000000000000000000000000000000000000',
+    ZetaToken: '0x0000000000000000000000000000000000000000'
   }
 };
 

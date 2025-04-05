@@ -32,7 +32,12 @@ const nextConfig = {
     '@walletconnect',
     '@metamask',
     'abitype'
-  ]
+  ],
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
 };
 
 module.exports = nextConfig;

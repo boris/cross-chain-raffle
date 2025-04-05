@@ -19,6 +19,7 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
   const [duration, setDuration] = useState<string>('7');
   const [minimumDeposit, setMinimumDeposit] = useState<string>('0.001');
   const [maxParticipants, setMaxParticipants] = useState<string>('100');
+  const [useMaxParticipants, setUseMaxParticipants] = useState<boolean>(true);
   
   // UI state
   const [processing, setProcessing] = useState<boolean>(false);
@@ -54,15 +55,20 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
     }
     
     try {
-      // Note: Currently, the smart contract only supports the name, description, and duration parameters
-      // The minimumDeposit and maxParticipants will require contract modifications to be used
+      // Calculate max participants value
+      const maxParticipantsValue = useMaxParticipants 
+        ? BigInt(parseInt(maxParticipants) || 100) 
+        : BigInt(0); // 0 means unlimited
       
-      // Create raffle - only using the parameters the current contract supports
+      console.log(`Creating raffle with name: ${name}, description: ${description}, duration: ${duration}`);
+      console.log(`Max participants: ${maxParticipantsValue}`);
+      
+      // Call contract with all parameters including maxParticipants
       await createRaffle({
         address: contractAddress,
         abi: ZetaRaffleABI,
         functionName: 'createRaffle',
-        args: [name, description, BigInt(duration)],
+        args: [name, description, BigInt(duration), maxParticipantsValue],
       });
       
       setSuccess(true);
@@ -175,18 +181,32 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
             </div>
             
             <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Maximum Participants
-              </label>
+              <div className="flex items-center mb-2">
+                <input
+                  type="checkbox"
+                  id="useMaxParticipants"
+                  checked={useMaxParticipants}
+                  onChange={(e) => setUseMaxParticipants(e.target.checked)}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <label htmlFor="useMaxParticipants" className="ml-2 block text-gray-700 text-sm font-bold">
+                  Limit participants
+                </label>
+              </div>
+              
               <input
                 type="number"
                 min="2"
                 value={maxParticipants}
                 onChange={(e) => setMaxParticipants(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md ${!useMaxParticipants ? 'bg-gray-100' : ''}`}
+                disabled={!useMaxParticipants}
+                required={useMaxParticipants}
               />
               <p className="text-sm text-gray-500 mt-1">
-                <span className="text-yellow-600">Note:</span> This feature requires contract modification
+                {useMaxParticipants 
+                  ? `Maximum number of participants: ${maxParticipants}`
+                  : "No limit on participants"}
               </p>
             </div>
             

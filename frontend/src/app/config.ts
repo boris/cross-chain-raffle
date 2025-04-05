@@ -69,21 +69,4 @@ export const supportedChains = [
     },
     testnet: true,
   },
-  {
-    id: 80001,
-    name: 'Polygon Mumbai',
-    nativeCurrency: {
-      name: 'MATIC',
-      symbol: 'MATIC',
-      decimals: 18,
-    },
-    rpcUrls: {
-      public: { http: ['https://polygon-mumbai.blockpi.network/v1/rpc/public'] },
-      default: { http: ['https://polygon-mumbai.blockpi.network/v1/rpc/public'] },
-    },
-    blockExplorers: {
-      default: { name: 'PolygonScan', url: 'https://mumbai.polygonscan.com' },
-    },
-    testnet: true,
-  },
 ];

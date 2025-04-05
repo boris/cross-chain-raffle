@@ -17,7 +17,7 @@ type ExternalChainContracts = {
 export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalChainContracts> = {
   // ZetaChain testnet
   7001: {
-    ZetaRaffle: '0x737C62db633B1FC25a80B703e8Ee31BcB429632E',
+    ZetaRaffle: '0x737C62db633B1FC25a80B703e8Ee31BcB429632E', // Boris: Needs to be updated if the contract is deployed again
     // ZRC20 tokens
     ZRC20Tokens: {
       97: '0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7', // BSC ZRC20

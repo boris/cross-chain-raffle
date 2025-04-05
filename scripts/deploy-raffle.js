@@ -36,6 +36,7 @@ async function main() {
   console.log(`ZetaRaffle deployed to: ${zetaRaffleAddress}`);
   
   // Register some common ZRC20 tokens with proper checksums
+  // This will create two TXs in the contract
   const zrc20Tokens = [
     { chainId: 97, symbol: "bBNB", address: ethers.getAddress("0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7") }, // USDC-BSC
     { chainId: 11155111, symbol: "sETH", address: ethers.getAddress("0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0") }, // Sepolia sETH

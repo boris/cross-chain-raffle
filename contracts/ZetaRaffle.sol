@@ -16,7 +16,7 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
 
     // Constants
-    uint256 public constant TICKET_PRICE = 10 * 10**18; // 10 tokens (adjusted for decimals)
+    uint256 public constant TICKET_PRICE = 0.001 * 10**18; // 0.001 tokens (adjusted for decimals)
     uint256 public constant MIN_PARTICIPANTS = 2; // Minimum participants to draw a winner
     uint256 public constant OPERATOR_FEE_PERCENTAGE = 5; // 5% fee for operator
     uint256 public constant ENTROPY_REQUEST_TIMEOUT = 24 hours; // Timeout for entropy request
@@ -42,6 +42,7 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
         uint256 totalTickets;
         uint64 entropyNonce;
         uint256 lastEntropyRequestTime;
+        uint256 maxParticipants; // Maximum number of participants (0 = unlimited)
     }
     
     struct Participant {
@@ -59,7 +60,7 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
     mapping(uint256 => uint64) public randomnessRequests; // raffleId => entropy nonce
     
     // Events
-    event RaffleCreated(uint256 indexed raffleId, string name, uint256 endTime);
+    event RaffleCreated(uint256 indexed raffleId, string name, uint256 endTime, uint256 maxParticipants);
     event TicketPurchased(
         uint256 indexed raffleId,
         address indexed participant,
@@ -122,11 +123,13 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
      * @param name Raffle name
      * @param description Raffle description
      * @param durationInDays Raffle duration in days
+     * @param maxParticipants Maximum number of participants (0 for unlimited)
      */
     function createRaffle(
         string memory name,
         string memory description,
-        uint256 durationInDays
+        uint256 durationInDays,
+        uint256 maxParticipants
     ) external onlyOwner {
         require(durationInDays > 0, "Duration must be positive");
         
@@ -145,10 +148,11 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
             winnerExternalAddress: "",
             totalTickets: 0,
             entropyNonce: 0,
-            lastEntropyRequestTime: 0
+            lastEntropyRequestTime: 0,
+            maxParticipants: maxParticipants
         });
         
-        emit RaffleCreated(raffleId, name, endTime);
+        emit RaffleCreated(raffleId, name, endTime, maxParticipants);
     }
     
     /**
@@ -179,6 +183,23 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
         
         RaffleInfo storage raffle = raffles[raffleId];
         require(block.timestamp < raffle.endTime, "Raffle already ended");
+        
+        // Check max participants limit if set
+        if (raffle.maxParticipants > 0) {
+            // Only count new participants toward the limit
+            if (raffleParticipants[raffleId][msg.sender].ticketCount == 0) {
+                // Calculate current unique participant count
+                uint256 participantCount = 0;
+                for (uint256 i = 0; i < raffle.totalTickets; i++) {
+                    (bool exists, address participant) = _raffleTicketMap[raffleId].tryGet(i);
+                    if (exists && raffleParticipants[raffleId][participant].ticketCount > 0) {
+                        participantCount++;
+                        i += raffleParticipants[raffleId][participant].ticketCount - 1; // Skip to next participant
+                    }
+                }
+                require(participantCount < raffle.maxParticipants, "Maximum participants reached");
+            }
+        }
         
         // Determine which ZRC20 token to use based on preferred chain
         address zrc20Address = chainToZRC20[preferredChainId];

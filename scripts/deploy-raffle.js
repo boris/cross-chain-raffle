@@ -15,8 +15,8 @@ async function main() {
   }
 
   // ZetaChain testnet addresses - let ethers handle the checksums
-  const pythEntropyAddress = ethers.getAddress("0xfd033a4e8be3ee5f31f1ed5bae5fa7f53a6bcb97"); 
-  const zetaConnectorAddress = ethers.getAddress("0x239e96c8f17c85c30100ac26f635ea15f23e9c67"); 
+  const pythEntropyAddress = ethers.getAddress("0x4374e5a8b9C22271E9EB878A2AA31DE97DF15DAF");   // pyth entropy address
+  const zetaConnectorAddress = ethers.getAddress("0x239e96c8f17c85c30100ac26f635ea15f23e9c67"); // zeta_tesnet connector
 
   // Deploy ZetaRaffle contract
   const [deployer] = await ethers.getSigners();
@@ -36,10 +36,11 @@ async function main() {
   console.log(`ZetaRaffle deployed to: ${zetaRaffleAddress}`);
   
   // Register some common ZRC20 tokens with proper checksums
+  // This will create two TXs in the contract
   const zrc20Tokens = [
-    { chainId: 97, symbol: "bBNB", address: ethers.getAddress("0x13a0c5930c028511dc02665e7285134b6d11a5f4") }, 
-    { chainId: 11155111, symbol: "sETH", address: ethers.getAddress("0x48f80608b672dc30dc7e3dbbd0343c5f02c738eb") }, 
-    { chainId: 80001, symbol: "mMATIC", address: ethers.getAddress("0x6f1c648eb474d6c14caa0bbbbb472c03dc191e28") }
+    { chainId: 97, symbol: "bBNB", address: ethers.getAddress("0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7") }, // USDC-BSC
+    { chainId: 11155111, symbol: "sETH", address: ethers.getAddress("0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0") }, // Sepolia sETH
+    //{ chainId: 80001, symbol: "mMATIC", address: ethers.getAddress("0x6f1c648eb474d6c14caa0bbbbb472c03dc191e28") }
   ];
   
   for (const token of zrc20Tokens) {
@@ -56,7 +57,7 @@ async function main() {
       `RAFFLE_CONTRACT_ADDRESS=${zetaRaffleAddress}`
     );
     fs.writeFileSync('.env', updatedEnvContent);
-    console.log(".env file updated with new contract address");
+    console.log(`>>> .env file updated with new contract address: ${zetaRaffleAddress}`);
   } catch (error) {
     console.error("Error updating .env file:", error.message);
     console.log(`Please manually update your .env file with: RAFFLE_CONTRACT_ADDRESS=${zetaRaffleAddress}`);

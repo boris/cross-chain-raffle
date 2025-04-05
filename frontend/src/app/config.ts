@@ -23,7 +23,7 @@ export const zetachainAthens: Chain = {
 export const appConfig = {
   appName: 'ZetaRaffle',
   mainChain: zetachainAthens,
-  ticketPrice: "10000000000000000000", // 10 tokens (in wei)
+  ticketPrice: "0.001", // 0.001 ZETA in wei
 };
 
 // Default provider options
@@ -66,23 +66,6 @@ export const supportedChains = [
     },
     blockExplorers: {
       default: { name: 'BscScan', url: 'https://testnet.bscscan.com' },
-    },
-    testnet: true,
-  },
-  {
-    id: 80001,
-    name: 'Polygon Mumbai',
-    nativeCurrency: {
-      name: 'MATIC',
-      symbol: 'MATIC',
-      decimals: 18,
-    },
-    rpcUrls: {
-      public: { http: ['https://polygon-mumbai.blockpi.network/v1/rpc/public'] },
-      default: { http: ['https://polygon-mumbai.blockpi.network/v1/rpc/public'] },
-    },
-    blockExplorers: {
-      default: { name: 'PolygonScan', url: 'https://mumbai.polygonscan.com' },
     },
     testnet: true,
   },

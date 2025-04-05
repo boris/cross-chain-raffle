@@ -59,13 +59,13 @@ async function main() {
           // Try to register ZRC20 tokens if missing
           if (chainId === 97) {
             console.log("Registering BSC ZRC20...");
-            await raffle.registerZRC20(97, "0x13A0c5930C028511Dc02665E7285134B6d11A5f4");
+            await raffle.registerZRC20(97, "0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7");
           } else if (chainId === 11155111) {
             console.log("Registering Sepolia ZRC20...");
-            await raffle.registerZRC20(11155111, "0x48f80608B672DC30DC7e3dbBd0343c5F02C738Eb");
-          } else if (chainId === 80001) {
-            console.log("Registering Mumbai ZRC20...");
-            await raffle.registerZRC20(80001, "0x6f1c648eb474d6c14caa0bbbbb472c03dc191e28");
+            await raffle.registerZRC20(11155111, "0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0");
+          //} else if (chainId === 80001) {
+          //  console.log("Registering Mumbai ZRC20...");
+          //  await raffle.registerZRC20(80001, "0x6f1c648eb474d6c14caa0bbbbb472c03dc191e28");
           }
         }
       } catch (error) {
@@ -94,12 +94,13 @@ async function main() {
     }
           
     console.log("\nCreating raffle...");
-    // Try with different duration value
+    // Create raffle with all required parameters
     const tx = await raffle.createRaffle(
       "First Raffle",
       "This is our first cross-chain raffle!",
-      1, // Try shorter duration in days
-      { gasLimit: 3000000 } // Very high gas limit for testing
+      1, // Duration in days
+      10, // Max participants (0 for unlimited)
+      { gasLimit: 3000000 } // Transaction options
     );
     
     console.log(`Transaction sent: ${tx.hash}`);

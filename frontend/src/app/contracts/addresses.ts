@@ -1,5 +1,5 @@
 // Define types for our contract addresses
-type ChainId = 7001 | 11155111 | 97 | 80001;
+type ChainId = 7001 | 11155111 | 97;
 
 type ZetaChainContracts = {
   ZetaRaffle: string;
@@ -17,12 +17,12 @@ type ExternalChainContracts = {
 export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalChainContracts> = {
   // ZetaChain testnet
   7001: {
-    ZetaRaffle: '0x31569c7d6232cbd335526f52160893ccc557faca',
+    // Boris: Needs to be updated if the contract is deployed again
+    ZetaRaffle: '0x14b31eAae6aC71Cef68430b199850b8cf4d84152', // Updated contract with maxParticipants parameter
     // ZRC20 tokens
     ZRC20Tokens: {
-      97: '0x13A0c5930C028511Dc02665E7285134B6d11A5f4', // BSC ZRC20
-      11155111: '0x48f80608B672DC30DC7e3dbBd0343c5F02C738Eb', // Sepolia ZRC20
-      80001: '0x6f1c648eb474d6c14caa0bbbbb472c03dc191e28', // Mumbai ZRC20
+      97: '0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7', // BSC ZRC20
+      11155111: '0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0', // Sepolia ZRC20
     }
   },
   // Ethereum Sepolia testnet
@@ -34,26 +34,19 @@ export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalCha
   97: {
     RaffleConnector: '0x_DEPLOYED_CONNECTOR_ADDRESS_BSC',
     ZetaToken: '0x0000000000000000000000000000000000000000' // Replace with actual address
-  },
-  // Polygon Mumbai testnet
-  80001: {
-    RaffleConnector: '0x_DEPLOYED_CONNECTOR_ADDRESS_MUMBAI',
-    ZetaToken: '0x0000000000000000000000000000000000000000' // Replace with actual address
   }
 };
 
 export const nativeTokenSymbols: Record<ChainId, string> = {
   7001: 'ZETA',
   11155111: 'ETH',
-  97: 'BNB',
-  80001: 'MATIC'
+  97: 'BNB'
 };
 
 export const chainNames: Record<ChainId, string> = {
   7001: 'ZetaChain Testnet',
   11155111: 'Ethereum Sepolia',
-  97: 'BSC Testnet',
-  80001: 'Polygon Mumbai'
+  97: 'BSC Testnet'
 };
 
 export const getChainColor = (chainId: number): string => {
@@ -76,6 +69,6 @@ export function getZetaChainContracts(): ZetaChainContracts {
   return contractAddresses[7001] as ZetaChainContracts;
 }
 
-export function getExternalChainContracts(chainId: 11155111 | 97 | 80001): ExternalChainContracts {
+export function getExternalChainContracts(chainId: 11155111 | 97): ExternalChainContracts {
   return contractAddresses[chainId] as ExternalChainContracts;
 }

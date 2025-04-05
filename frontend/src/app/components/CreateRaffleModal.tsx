@@ -17,7 +17,7 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
   const [name, setName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [duration, setDuration] = useState<string>('7');
-  const [minimumDeposit, setMinimumDeposit] = useState<string>('10');
+  const [minimumDeposit, setMinimumDeposit] = useState<string>('0.001');
   const [maxParticipants, setMaxParticipants] = useState<string>('100');
   
   // UI state
@@ -168,7 +168,6 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
                 value={minimumDeposit}
                 onChange={(e) => setMinimumDeposit(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
-                disabled
               />
               <p className="text-sm text-gray-500 mt-1">
                 <span className="text-yellow-600">Note:</span> Currently fixed at 10 tokens per ticket in the contract
@@ -185,7 +184,6 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
                 value={maxParticipants}
                 onChange={(e) => setMaxParticipants(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
-                disabled
               />
               <p className="text-sm text-gray-500 mt-1">
                 <span className="text-yellow-600">Note:</span> This feature requires contract modification

@@ -94,12 +94,13 @@ async function main() {
     }
           
     console.log("\nCreating raffle...");
-    // Try with different duration value
+    // Create raffle with all required parameters
     const tx = await raffle.createRaffle(
       "First Raffle",
       "This is our first cross-chain raffle!",
-      1, // Try shorter duration in days
-      { gasLimit: 3000000 } // Very high gas limit for testing
+      1, // Duration in days
+      10, // Max participants (0 for unlimited)
+      { gasLimit: 3000000 } // Transaction options
     );
     
     console.log(`Transaction sent: ${tx.hash}`);

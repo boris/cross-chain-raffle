@@ -9,6 +9,7 @@ import { contractAddresses, chainNames } from '../contracts/addresses';
 import { appConfig } from '../config';
 import { formatTimestamp } from '../utils/date';
 import dynamic from 'next/dynamic';
+import { formatEther } from 'ethers';
 
 // TypeScript interface for window.ethereum
 interface EthereumProvider {
@@ -157,10 +158,8 @@ export default function MyTickets() {
             
             // For now, create a simple participant object
             const participantObj: Participant = {
-              zetaAddress: address,
-              chainId: 0,
-              externalAddress: '',
-              ticketCount: count
+              userAddress: address,
+              ticketCount: 0
             };
             
             participantData.push({
@@ -264,32 +263,28 @@ export default function MyTickets() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                        ${raffle.state === RaffleState.OPEN 
+                        ${raffle.state === RaffleState.ACTIVE 
                           ? 'bg-green-100 text-green-800' 
-                          : raffle.state === RaffleState.DRAWING 
+                          : raffle.state === RaffleState.FINISHED 
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {raffle.state === RaffleState.OPEN 
-                          ? 'Open' 
-                          : raffle.state === RaffleState.DRAWING 
-                            ? 'Drawing'
-                            : 'Complete'
+                        {raffle.state === RaffleState.ACTIVE 
+                          ? 'Active' 
+                          : raffle.state === RaffleState.FINISHED 
+                            ? 'Finished'
+                            : 'Completed'
                         }
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {raffle.state === RaffleState.COMPLETE ? (
-                        raffle.winner.toLowerCase() === address?.toLowerCase() ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                            Winner!
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-500">Better luck next time</span>
-                        )
+                      {raffle.state === RaffleState.COMPLETED ? (
+                        <div className="text-sm text-green-600 font-medium">
+                          {formatEther(BigInt(raffle.prizePool))} ETH
+                        </div>
                       ) : (
-                        <span className="text-sm text-gray-500">Pending</span>
+                        <div className="text-sm text-gray-900">-</div>
                       )}
                     </td>
                   </tr>

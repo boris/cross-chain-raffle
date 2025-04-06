@@ -16,10 +16,9 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
   // Form fields
   const [name, setName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [duration, setDuration] = useState<string>('7');
-  const [minimumDeposit, setMinimumDeposit] = useState<string>('0.001');
-  const [maxParticipants, setMaxParticipants] = useState<string>('100');
-  const [useMaxParticipants, setUseMaxParticipants] = useState<boolean>(true);
+  const [duration, setDuration] = useState<string>('1');
+  const [maxTickets, setMaxTickets] = useState<string>('100');
+  const [useMaxTickets, setUseMaxTickets] = useState<boolean>(true);
   
   // UI state
   const [processing, setProcessing] = useState<boolean>(false);
@@ -55,20 +54,20 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
     }
     
     try {
-      // Calculate max participants value
-      const maxParticipantsValue = useMaxParticipants 
-        ? BigInt(parseInt(maxParticipants) || 100) 
+      // Calculate max tickets value
+      const maxTicketsValue = useMaxTickets 
+        ? BigInt(parseInt(maxTickets) || 100) 
         : BigInt(0); // 0 means unlimited
       
       console.log(`Creating raffle with name: ${name}, description: ${description}, duration: ${duration}`);
-      console.log(`Max participants: ${maxParticipantsValue}`);
+      console.log(`Max tickets: ${maxTicketsValue}`);
       
-      // Call contract with all parameters including maxParticipants
+      // Call contract with all parameters including maxTickets
       await createRaffle({
         address: contractAddress,
         abi: ZetaRaffleABI,
         functionName: 'createRaffle',
-        args: [name, description, BigInt(duration), maxParticipantsValue],
+        args: [name, description, BigInt(duration), maxTicketsValue],
       });
       
       setSuccess(true);
@@ -166,17 +165,16 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
             
             <div className="mb-4">
               <label className="block text-gray-700 text-sm font-bold mb-2">
-                Minimum Deposit (Tokens)
+                Ticket Price
               </label>
               <input
-                type="number"
-                min="0.001"
-                value={minimumDeposit}
-                onChange={(e) => setMinimumDeposit(e.target.value)}
+                type="text"
+                value="0.1 ZETA"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                disabled
               />
               <p className="text-sm text-gray-500 mt-1">
-                <span className="text-yellow-600">Note:</span> Currently fixed at 10 tokens per ticket in the contract
+                <span className="text-yellow-600">Note:</span> Ticket price is fixed at 0.1 ZETA per ticket in the contract
               </p>
             </div>
             
@@ -184,29 +182,29 @@ export function CreateRaffleModal({ onClose, onSuccess }: CreateRaffleModalProps
               <div className="flex items-center mb-2">
                 <input
                   type="checkbox"
-                  id="useMaxParticipants"
-                  checked={useMaxParticipants}
-                  onChange={(e) => setUseMaxParticipants(e.target.checked)}
+                  id="useMaxTickets"
+                  checked={useMaxTickets}
+                  onChange={(e) => setUseMaxTickets(e.target.checked)}
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                 />
-                <label htmlFor="useMaxParticipants" className="ml-2 block text-gray-700 text-sm font-bold">
-                  Limit participants
+                <label htmlFor="useMaxTickets" className="ml-2 block text-gray-700 text-sm font-bold">
+                  Limit total tickets
                 </label>
               </div>
               
               <input
                 type="number"
                 min="2"
-                value={maxParticipants}
-                onChange={(e) => setMaxParticipants(e.target.value)}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md ${!useMaxParticipants ? 'bg-gray-100' : ''}`}
-                disabled={!useMaxParticipants}
-                required={useMaxParticipants}
+                value={maxTickets}
+                onChange={(e) => setMaxTickets(e.target.value)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md ${!useMaxTickets ? 'bg-gray-100' : ''}`}
+                disabled={!useMaxTickets}
+                required={useMaxTickets}
               />
               <p className="text-sm text-gray-500 mt-1">
-                {useMaxParticipants 
-                  ? `Maximum number of participants: ${maxParticipants}`
-                  : "No limit on participants"}
+                {useMaxTickets 
+                  ? `Maximum number of tickets: ${maxTickets}`
+                  : "No limit on tickets"}
               </p>
             </div>
             

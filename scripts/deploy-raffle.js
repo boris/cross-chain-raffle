@@ -15,38 +15,25 @@ async function main() {
   }
 
   // ZetaChain testnet addresses - let ethers handle the checksums
-  const pythEntropyAddress = ethers.getAddress("0x4374e5a8b9C22271E9EB878A2AA31DE97DF15DAF");   // pyth entropy address
-  const zetaConnectorAddress = ethers.getAddress("0x239e96c8f17c85c30100ac26f635ea15f23e9c67"); // zeta_tesnet connector
-
+  const pythEntropyAddress = ethers.getAddress("0x4374e5a8b9C22271E9EB878A2AA31DE97DF15DAF");   // pyth entropy address for testnet
+  const zetaTokenAddress = ethers.getAddress("0x5F0b1a82749cb4E2278EC87F8BF6B618dC71a8bf");     // ZETA token on testnet
+  
   // Deploy ZetaRaffle contract
   const [deployer] = await ethers.getSigners();
   console.log(`Deploying ZetaRaffle with account: ${deployer.address}`);
   console.log(`Using Pyth Entropy: ${pythEntropyAddress}`);
-  console.log(`Using ZetaConnector: ${zetaConnectorAddress}`);
+  console.log(`Using ZETA Token: ${zetaTokenAddress}`);
   
   const ZetaRaffle = await ethers.getContractFactory("ZetaRaffle");
   const zetaRaffle = await ZetaRaffle.deploy(
     pythEntropyAddress, 
-    zetaConnectorAddress,
+    zetaTokenAddress,
     deployer.address // owner address
   );
   
   await zetaRaffle.waitForDeployment();
   const zetaRaffleAddress = await zetaRaffle.getAddress();
   console.log(`ZetaRaffle deployed to: ${zetaRaffleAddress}`);
-  
-  // Register some common ZRC20 tokens with proper checksums
-  // This will create two TXs in the contract
-  const zrc20Tokens = [
-    { chainId: 97, symbol: "bBNB", address: ethers.getAddress("0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7") }, // USDC-BSC
-    { chainId: 11155111, symbol: "sETH", address: ethers.getAddress("0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0") }, // Sepolia sETH
-    //{ chainId: 80001, symbol: "mMATIC", address: ethers.getAddress("0x6f1c648eb474d6c14caa0bbbbb472c03dc191e28") }
-  ];
-  
-  for (const token of zrc20Tokens) {
-    console.log(`Registering ZRC20 for chain ${token.chainId} (${token.symbol}): ${token.address}`);
-    await zetaRaffle.registerZRC20(token.chainId, token.address);
-  }
   
   console.log("Writing new contract address to .env file");
   try {

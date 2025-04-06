@@ -9,25 +9,23 @@ import "./interfaces/ZetaInterfaces.sol";
 
 /**
  * @title ZetaRaffle
- * @dev A cross-chain raffle system built on ZetaChain that supports entries from multiple chains
+ * @dev A raffle system built on ZetaChain that uses ZETA as payment and reward method
  */
-contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
+contract ZetaRaffle is Ownable, ReentrancyGuard {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
-    using EnumerableMap for EnumerableMap.AddressToUintMap;
 
     // Constants
-    uint256 public constant TICKET_PRICE = 0.001 * 10**18; // 0.001 tokens (adjusted for decimals)
+    uint256 public constant TICKET_PRICE = 0.1 * 10**18; // 0.1 ZETA
     uint256 public constant MIN_PARTICIPANTS = 2; // Minimum participants to draw a winner
     uint256 public constant OPERATOR_FEE_PERCENTAGE = 5; // 5% fee for operator
     uint256 public constant ENTROPY_REQUEST_TIMEOUT = 24 hours; // Timeout for entropy request
     
     // Addresses
     address public pythEntropyAddress;
-    address public zetaConnectorAddress;
-    mapping(uint256 => address) public chainToZRC20; // Chain ID to ZRC20 token address
+    address public zetaToken;
     
     // Structs
-    enum RaffleState { OPEN, DRAWING, COMPLETE }
+    enum RaffleState { ACTIVE, FINISHED, COMPLETED }
     
     struct RaffleInfo {
         uint256 raffleId;
@@ -37,18 +35,14 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
         uint256 prizePool;
         RaffleState state;
         address winner;
-        uint256 winnerChainId;
-        bytes winnerExternalAddress;
         uint256 totalTickets;
+        uint256 maxTickets; // Maximum number of tickets available
         uint64 entropyNonce;
         uint256 lastEntropyRequestTime;
-        uint256 maxParticipants; // Maximum number of participants (0 = unlimited)
     }
     
     struct Participant {
-        address zetaAddress;
-        uint256 chainId;
-        bytes externalAddress;
+        address userAddress;
         uint256 ticketCount;
     }
     
@@ -60,12 +54,10 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
     mapping(uint256 => uint64) public randomnessRequests; // raffleId => entropy nonce
     
     // Events
-    event RaffleCreated(uint256 indexed raffleId, string name, uint256 endTime, uint256 maxParticipants);
+    event RaffleCreated(uint256 indexed raffleId, string name, uint256 endTime, uint256 maxTickets);
     event TicketPurchased(
         uint256 indexed raffleId,
         address indexed participant,
-        uint256 chainId,
-        bytes externalAddress,
         uint256 ticketCount,
         uint256 totalTickets
     );
@@ -74,8 +66,6 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
     event WinnerSelected(
         uint256 indexed raffleId,
         address indexed winner,
-        uint256 winnerChainId,
-        bytes winnerExternalAddress,
         uint256 prizeAmount
     );
     event PrizeClaimed(uint256 indexed raffleId, address indexed winner, uint256 amount);
@@ -94,26 +84,32 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
         _;
     }
     
-    modifier raffleIsOpen(uint256 raffleId) {
-        require(raffles[raffleId].state == RaffleState.OPEN, "Raffle not open");
+    modifier raffleIsActive(uint256 raffleId) {
+        require(raffles[raffleId].state == RaffleState.ACTIVE, "Raffle not active");
         _;
     }
     
     modifier raffleCanBeDrawn(uint256 raffleId) {
-        require(raffles[raffleId].state == RaffleState.OPEN, "Raffle not open");
-        require(block.timestamp >= raffles[raffleId].endTime, "Raffle not ended");
-        require(raffles[raffleId].totalTickets >= MIN_PARTICIPANTS, "Not enough participants");
+        RaffleInfo storage raffle = raffles[raffleId];
+        require(raffle.state == RaffleState.FINISHED, "Raffle not finished");
+        
+        // Allow drawing if end time has passed OR all tickets have been sold (for raffles with max tickets)
+        bool timeExpired = block.timestamp >= raffle.endTime;
+        bool soldOut = raffle.maxTickets > 0 && raffle.totalTickets == raffle.maxTickets;
+        
+        require(timeExpired || soldOut, "Raffle not ended yet");
+        require(raffle.totalTickets >= MIN_PARTICIPANTS, "Not enough participants");
         _;
     }
     
     // Constructor
     constructor(
         address _pythEntropyAddress,
-        address _zetaConnectorAddress,
+        address _zetaToken,
         address _initialOwner
     ) Ownable(_initialOwner) {
         pythEntropyAddress = _pythEntropyAddress;
-        zetaConnectorAddress = _zetaConnectorAddress;
+        zetaToken = _zetaToken;
     }
     
     // External functions
@@ -123,14 +119,14 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
      * @param name Raffle name
      * @param description Raffle description
      * @param durationInDays Raffle duration in days
-     * @param maxParticipants Maximum number of participants (0 for unlimited)
+     * @param maxTickets Maximum number of tickets available (0 for unlimited)
      */
     function createRaffle(
         string memory name,
         string memory description,
         uint256 durationInDays,
-        uint256 maxParticipants
-    ) external onlyOwner {
+        uint256 maxTickets
+    ) external {
         require(durationInDays > 0, "Duration must be positive");
         
         uint256 raffleId = _raffleIdCounter++;
@@ -142,86 +138,68 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
             description: description,
             endTime: endTime,
             prizePool: 0,
-            state: RaffleState.OPEN,
+            state: RaffleState.ACTIVE,
             winner: address(0),
-            winnerChainId: 0,
-            winnerExternalAddress: "",
             totalTickets: 0,
+            maxTickets: maxTickets,
             entropyNonce: 0,
-            lastEntropyRequestTime: 0,
-            maxParticipants: maxParticipants
+            lastEntropyRequestTime: 0
         });
         
-        emit RaffleCreated(raffleId, name, endTime, maxParticipants);
+        emit RaffleCreated(raffleId, name, endTime, maxTickets);
     }
     
     /**
-     * @dev Register ZRC20 token for a chain
-     * @param chainId Chain ID
-     * @param zrc20Address ZRC20 token address
+     * @dev Update Pyth Entropy address
+     * @param _pythEntropyAddress New Pyth Entropy address
      */
-    function registerZRC20(uint256 chainId, address zrc20Address) external onlyOwner {
-        require(zrc20Address != address(0), "Invalid ZRC20 address");
-        chainToZRC20[chainId] = zrc20Address;
+    function updatePythEntropyAddress(address _pythEntropyAddress) external onlyOwner {
+        require(_pythEntropyAddress != address(0), "Invalid address");
+        pythEntropyAddress = _pythEntropyAddress;
     }
     
     /**
-     * @dev Buy tickets for a raffle with ZRC20 tokens (for participants already on ZetaChain)
+     * @dev Buy tickets for a raffle with ZETA tokens
      * @param raffleId Raffle ID
      * @param ticketCount Number of tickets to buy
-     * @param preferredChainId Chain ID where user wants to receive prizes
-     * @param externalAddress External address on the preferred chain (in bytes format)
      */
     function buyTickets(
         uint256 raffleId,
-        uint256 ticketCount,
-        uint256 preferredChainId,
-        bytes calldata externalAddress
-    ) external raffleExists(raffleId) raffleIsOpen(raffleId) nonReentrant {
+        uint256 ticketCount
+    ) external payable raffleExists(raffleId) raffleIsActive(raffleId) nonReentrant {
         require(ticketCount > 0, "Must buy at least one ticket");
-        require(externalAddress.length > 0, "External address required");
         
         RaffleInfo storage raffle = raffles[raffleId];
         require(block.timestamp < raffle.endTime, "Raffle already ended");
         
-        // Check max participants limit if set
-        if (raffle.maxParticipants > 0) {
-            // Only count new participants toward the limit
-            if (raffleParticipants[raffleId][msg.sender].ticketCount == 0) {
-                // Calculate current unique participant count
-                uint256 participantCount = 0;
-                for (uint256 i = 0; i < raffle.totalTickets; i++) {
-                    (bool exists, address participant) = _raffleTicketMap[raffleId].tryGet(i);
-                    if (exists && raffleParticipants[raffleId][participant].ticketCount > 0) {
-                        participantCount++;
-                        i += raffleParticipants[raffleId][participant].ticketCount - 1; // Skip to next participant
-                    }
-                }
-                require(participantCount < raffle.maxParticipants, "Maximum participants reached");
+        // Check if max tickets limit is reached
+        if (raffle.maxTickets > 0) {
+            require(raffle.totalTickets + ticketCount <= raffle.maxTickets, "Not enough tickets available");
+            
+            // If this purchase completes the ticket sale, change state to FINISHED
+            if (raffle.totalTickets + ticketCount == raffle.maxTickets) {
+                raffle.state = RaffleState.FINISHED;
+                emit RaffleStateChanged(raffleId, RaffleState.FINISHED);
+                
+                // Defer the drawing to a separate transaction to avoid reversion
+                // The owner can call autoDrawWinner, or anyone can call it if we make it permissionless
             }
         }
         
-        // Determine which ZRC20 token to use based on preferred chain
-        address zrc20Address = chainToZRC20[preferredChainId];
-        require(zrc20Address != address(0), "Unsupported chain");
-        
         uint256 totalPrice = TICKET_PRICE * ticketCount;
         
-        // Transfer tokens from user to contract
-        IZRC20 zrc20 = IZRC20(zrc20Address);
-        require(zrc20.transferFrom(msg.sender, address(this), totalPrice), "Token transfer failed");
+        // Ensure correct amount is sent
+        require(msg.value == totalPrice, "Incorrect ZETA amount sent");
         
         // Update participant info
-        _updateParticipant(raffleId, msg.sender, preferredChainId, externalAddress, ticketCount);
+        _updateParticipant(raffleId, msg.sender, ticketCount);
         
         // Update prize pool
         raffle.prizePool += totalPrice;
         
         emit TicketPurchased(
             raffleId, 
-            msg.sender, 
-            preferredChainId, 
-            externalAddress, 
+            msg.sender,
             ticketCount, 
             raffle.totalTickets
         );
@@ -237,30 +215,20 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
         raffleCanBeDrawn(raffleId) 
         onlyOwner
     {
-        RaffleInfo storage raffle = raffles[raffleId];
-        
-        // Ensure we're not already in drawing state or if it's been too long since last request
-        if (raffle.state == RaffleState.DRAWING) {
-            require(
-                block.timestamp > raffle.lastEntropyRequestTime + ENTROPY_REQUEST_TIMEOUT,
-                "Previous entropy request still pending"
-            );
-        }
-        
-        // Update state to drawing
-        raffle.state = RaffleState.DRAWING;
-        emit RaffleStateChanged(raffleId, RaffleState.DRAWING);
-        
-        // Request randomness from Pyth Entropy
-        uint64 nonce = uint64(uint256(keccak256(abi.encodePacked(block.timestamp, raffleId, _raffleIdCounter))));
-        randomnessRequests[raffleId] = nonce;
-        raffle.entropyNonce = nonce;
-        raffle.lastEntropyRequestTime = block.timestamp;
-        
-        IPythEntropy entropy = IPythEntropy(pythEntropyAddress);
-        entropy.generateRandomNumber(nonce);
-        
-        emit EntropyRequested(raffleId, nonce);
+        _initiateDrawing(raffleId);
+    }
+    
+    /**
+     * @dev Allow anyone to draw a winner for a raffle if it's in FINISHED state
+     * @param raffleId Raffle ID
+     */
+    function autoDrawWinner(uint256 raffleId) 
+        external 
+        raffleExists(raffleId) 
+        raffleCanBeDrawn(raffleId)
+        onlyOwner
+    {
+        _initiateDrawing(raffleId);
     }
     
     /**
@@ -292,18 +260,19 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
     }
     
     /**
-     * @dev Claim prize as a winner
+     * @dev Claim prize automatically sends rewards to the winner
      * @param raffleId Raffle ID
      */
     function claimPrize(uint256 raffleId) 
         external 
-        raffleExists(raffleId) 
-        onlyParticipant(raffleId) 
+        raffleExists(raffleId)
+        onlyOwner
         nonReentrant
     {
         RaffleInfo storage raffle = raffles[raffleId];
-        require(raffle.state == RaffleState.COMPLETE, "Raffle not complete");
-        require(raffle.winner == msg.sender, "Not the winner");
+        require(raffle.state == RaffleState.COMPLETED, "Raffle not completed");
+        require(raffle.winner != address(0), "No winner selected");
+        require(raffle.prizePool > 0, "Prize already claimed");
         
         // Calculate prize amount (minus operator fee)
         uint256 operatorFee = (raffle.prizePool * OPERATOR_FEE_PERCENTAGE) / 100;
@@ -313,74 +282,14 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
         raffle.prizePool = 0;
         
         // Send operator fee to owner
-        address zrc20Address = chainToZRC20[raffle.winnerChainId];
-        IZRC20 zrc20 = IZRC20(zrc20Address);
-        require(zrc20.transfer(owner(), operatorFee), "Fee transfer failed");
+        (bool feeSuccess, ) = payable(owner()).call{value: operatorFee}("");
+        require(feeSuccess, "Fee transfer failed");
         
-        // If winner is on ZetaChain, transfer tokens directly
-        if (raffle.winnerExternalAddress.length == 0) {
-            require(zrc20.transfer(raffle.winner, prizeAmount), "Prize transfer failed");
-        } else {
-            // Otherwise, withdraw to external chain
-            zrc20.withdraw(raffle.winnerExternalAddress, prizeAmount);
-        }
+        // Send prize to winner
+        (bool prizeSuccess, ) = payable(raffle.winner).call{value: prizeAmount}("");
+        require(prizeSuccess, "Prize transfer failed");
         
-        emit PrizeClaimed(raffleId, msg.sender, prizeAmount);
-    }
-    
-    /**
-     * @dev ZetaChain message receiver
-     */
-    function onZetaMessage(
-        // Boris: are the next two parameters correct?
-        bytes32 messageHash,
-        address zrc20,
-        uint256 amount,
-        bytes calldata message
-    ) external override {
-        require(msg.sender == zetaConnectorAddress, "Only ZetaConnector can call");
-        
-        // Decode message (raffleId, participant address, chain ID, external address)
-        (uint256 raffleId, address participant, uint256 chainId, bytes memory externalAddress) = 
-            abi.decode(message, (uint256, address, uint256, bytes));
-            
-        require(raffleId < _raffleIdCounter, "Invalid raffle ID");
-        RaffleInfo storage raffle = raffles[raffleId];
-        require(raffle.state == RaffleState.OPEN, "Raffle not open");
-        
-        // Calculate ticket count
-        uint256 ticketCount = amount / TICKET_PRICE;
-        require(ticketCount > 0, "Amount too small");
-        
-        // Update participant info
-        _updateParticipant(raffleId, participant, chainId, externalAddress, ticketCount);
-        
-        // Update prize pool
-        raffle.prizePool += amount;
-        
-        emit TicketPurchased(
-            raffleId, 
-            participant, 
-            chainId, 
-            externalAddress, 
-            ticketCount, 
-            raffle.totalTickets
-        );
-    }
-    
-    /**
-     * @dev ZetaChain revert message handler
-     */
-    function onZetaRevert(
-        // Boris: are `messageHash` and `calldata message` correct?
-        bytes32 messageHash,
-        address zrc20,
-        uint256 amount,
-        bytes calldata message
-    ) external override {
-        require(msg.sender == zetaConnectorAddress, "Only ZetaConnector can call");
-        // Handle revert by returning tokens to contract owner
-        IZRC20(zrc20).transfer(owner(), amount);
+        emit PrizeClaimed(raffleId, raffle.winner, prizeAmount);
     }
     
     // Internal functions
@@ -391,8 +300,6 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
     function _updateParticipant(
         uint256 raffleId,
         address participant,
-        uint256 chainId,
-        bytes memory externalAddress,
         uint256 ticketCount
     ) internal {
         RaffleInfo storage raffle = raffles[raffleId];
@@ -400,18 +307,11 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
         
         if (p.ticketCount == 0) {
             // New participant
-            p.zetaAddress = participant;
-            p.chainId = chainId;
-            p.externalAddress = externalAddress;
+            p.userAddress = participant;
             p.ticketCount = ticketCount;
         } else {
             // Existing participant
             p.ticketCount += ticketCount;
-            // Update chain preference if provided
-            if (externalAddress.length > 0) {
-                p.chainId = chainId;
-                p.externalAddress = externalAddress;
-            }
         }
         
         // Assign tickets
@@ -429,7 +329,7 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
      */
     function _selectWinner(uint256 raffleId, uint256 randomNumber) internal {
         RaffleInfo storage raffle = raffles[raffleId];
-        require(raffle.state == RaffleState.DRAWING, "Raffle not in drawing state");
+        require(raffle.state == RaffleState.FINISHED, "Raffle not in finished state");
         require(raffle.totalTickets >= MIN_PARTICIPANTS, "Not enough participants");
         
         // Use randomNumber to select a ticket
@@ -437,20 +337,42 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
         address winnerAddress = _raffleTicketMap[raffleId].get(winningTicket);
         
         // Update raffle with winner info
-        Participant storage winner = raffleParticipants[raffleId][winnerAddress];
         raffle.winner = winnerAddress;
-        raffle.winnerChainId = winner.chainId;
-        raffle.winnerExternalAddress = winner.externalAddress;
-        raffle.state = RaffleState.COMPLETE;
+        raffle.state = RaffleState.COMPLETED;
         
-        emit RaffleStateChanged(raffleId, RaffleState.COMPLETE);
+        emit RaffleStateChanged(raffleId, RaffleState.COMPLETED);
         emit WinnerSelected(
             raffleId, 
-            winnerAddress, 
-            winner.chainId, 
-            winner.externalAddress, 
+            winnerAddress,
             raffle.prizePool
         );
+    }
+    
+    /**
+     * @dev Internal function to initiate the drawing process
+     * @param raffleId Raffle ID
+     */
+    function _initiateDrawing(uint256 raffleId) internal {
+        RaffleInfo storage raffle = raffles[raffleId];
+        
+        // Ensure we're not already requesting entropy or if it's been too long since last request
+        if (raffle.lastEntropyRequestTime > 0) {
+            require(
+                block.timestamp > raffle.lastEntropyRequestTime + ENTROPY_REQUEST_TIMEOUT,
+                "Previous entropy request still pending"
+            );
+        }
+        
+        // Request randomness from Pyth Entropy
+        uint64 nonce = uint64(uint256(keccak256(abi.encodePacked(block.timestamp, raffleId, _raffleIdCounter))));
+        randomnessRequests[raffleId] = nonce;
+        raffle.entropyNonce = nonce;
+        raffle.lastEntropyRequestTime = block.timestamp;
+        
+        IPythEntropy entropy = IPythEntropy(pythEntropyAddress);
+        entropy.generateRandomNumber(nonce);
+        
+        emit EntropyRequested(raffleId, nonce);
     }
     
     // View functions
@@ -487,4 +409,9 @@ contract ZetaRaffle is Ownable, ReentrancyGuard, ZetaReceiver {
     {
         return raffleParticipants[raffleId][participant].ticketCount;
     }
+    
+    /**
+     * @dev Receive function to accept ZETA
+     */
+    receive() external payable {}
 }

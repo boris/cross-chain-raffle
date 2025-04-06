@@ -43,34 +43,20 @@ async function main() {
       return;
     }
     
-    // Check if ZRC20 tokens are registered
-    console.log("Checking ZRC20 token registrations...");
+    // Get Pyth Entropy address
+    try {
+      const pythEntropyAddress = await raffle.pythEntropyAddress();
+      console.log(`Pyth Entropy address: ${pythEntropyAddress}`);
+    } catch (error) {
+      console.error("Error getting Pyth Entropy address:", error.message);
+    }
     
-    const chainIds = [97, 11155111, 80001]; // BSC, Sepolia, Mumbai
-    
-    for (const chainId of chainIds) {
-      try {
-        const zrc20Address = await raffle.chainToZRC20(chainId);
-        console.log(`Chain ${chainId} ZRC20 address: ${zrc20Address}`);
-        
-        if (zrc20Address === "0x0000000000000000000000000000000000000000") {
-          console.log(`WARNING: No ZRC20 registered for chain ${chainId}. This might cause issues.`);
-          
-          // Try to register ZRC20 tokens if missing
-          if (chainId === 97) {
-            console.log("Registering BSC ZRC20...");
-            await raffle.registerZRC20(97, "0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7");
-          } else if (chainId === 11155111) {
-            console.log("Registering Sepolia ZRC20...");
-            await raffle.registerZRC20(11155111, "0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0");
-          //} else if (chainId === 80001) {
-          //  console.log("Registering Mumbai ZRC20...");
-          //  await raffle.registerZRC20(80001, "0x6f1c648eb474d6c14caa0bbbbb472c03dc191e28");
-          }
-        }
-      } catch (error) {
-        console.error(`Error checking ZRC20 for chain ${chainId}:`, error.message);
-      }
+    // Get ZETA token
+    try {
+      const zetaTokenAddress = await raffle.zetaToken();
+      console.log(`ZETA token address: ${zetaTokenAddress}`);
+    } catch (error) {
+      console.error("Error getting ZETA token address:", error.message);
     }
     
     // Try estimating gas for the function to see if it's valid
@@ -78,8 +64,9 @@ async function main() {
     try {
       const gasEstimate = await raffle.createRaffle.estimateGas(
         "First Raffle",
-        "This is our first cross-chain raffle!",
-        7 // Duration in days
+        "This is our first ZETA raffle!",
+        7, // Duration in days
+        100 // Max tickets (0 for unlimited)
       );
       console.log(`Estimated gas: ${gasEstimate.toString()}`);
       
@@ -97,9 +84,9 @@ async function main() {
     // Create raffle with all required parameters
     const tx = await raffle.createRaffle(
       "First Raffle",
-      "This is our first cross-chain raffle!",
+      "This is our first ZETA raffle!",
       1, // Duration in days
-      10, // Max participants (0 for unlimited)
+      100, // Max tickets (0 for unlimited)
       { gasLimit: 3000000 } // Transaction options
     );
     

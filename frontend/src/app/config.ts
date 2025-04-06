@@ -23,7 +23,7 @@ export const zetachainAthens: Chain = {
 export const appConfig = {
   appName: 'ZetaRaffle',
   mainChain: zetachainAthens,
-  ticketPrice: "0.001", // 0.001 ZETA in wei
+  ticketPrice: "0.1", // 0.1 ZETA in wei
 };
 
 // Default provider options

@@ -108,67 +108,28 @@ export function RaffleList({ userAddress }: RaffleListProps) {
     );
   }
 
-  // Filter active raffles (OPEN state) first, then drawing, then completed ones
-  const activeRaffles = raffles.filter(raffle => raffle.state === RaffleState.OPEN);
-  const drawingRaffles = raffles.filter(raffle => raffle.state === RaffleState.DRAWING);
-  const completedRaffles = raffles.filter(raffle => raffle.state === RaffleState.COMPLETE);
+  // Filter raffles by state
+  const activeRaffles = raffles.filter(raffle => raffle.state === RaffleState.ACTIVE);
+  const finishedRaffles = raffles.filter(raffle => raffle.state === RaffleState.FINISHED);
+  const completedRaffles = raffles.filter(raffle => raffle.state === RaffleState.COMPLETED);
 
   // Sort by end time (ascending for active, descending for completed)
   activeRaffles.sort((a, b) => Number(a.endTime) - Number(b.endTime));
   completedRaffles.sort((a, b) => Number(b.endTime) - Number(a.endTime));
 
   // Combine sorted arrays
-  const sortedRaffles = [...activeRaffles, ...drawingRaffles, ...completedRaffles];
+  const sortedRaffles = [...activeRaffles, ...finishedRaffles, ...completedRaffles];
 
   return (
-    <div>
-      {activeRaffles.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Active Raffles</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeRaffles.map((raffle) => (
-              <RaffleCard
-                key={raffle.raffleId.toString()}
-                raffle={raffle}
-                userAddress={effectiveAddress}
-                onUpdate={() => refetch()}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {drawingRaffles.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Drawing Raffles</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {drawingRaffles.map((raffle) => (
-              <RaffleCard
-                key={raffle.raffleId.toString()}
-                raffle={raffle}
-                userAddress={effectiveAddress}
-                onUpdate={() => refetch()}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {completedRaffles.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Completed Raffles</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {completedRaffles.map((raffle) => (
-              <RaffleCard
-                key={raffle.raffleId.toString()}
-                raffle={raffle}
-                userAddress={effectiveAddress}
-                onUpdate={() => refetch()}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {sortedRaffles.map((raffle) => (
+        <RaffleCard 
+          key={raffle.raffleId.toString()} 
+          raffle={raffle} 
+          userAddress={effectiveAddress} 
+          onUpdate={refetch}
+        />
+      ))}
     </div>
   );
 }

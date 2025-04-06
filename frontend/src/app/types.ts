@@ -1,7 +1,7 @@
 export enum RaffleState {
-    OPEN,
-    DRAWING,
-    COMPLETE
+    ACTIVE,
+    FINISHED,
+    COMPLETED
   }
   
   export interface RaffleInfo {
@@ -12,17 +12,14 @@ export enum RaffleState {
     prizePool: string;
     state: RaffleState;
     winner: string;
-    winnerChainId: number;
-    winnerExternalAddress: string;
     totalTickets: number;
+    maxTickets: number;
     entropyNonce: number;
     lastEntropyRequestTime: number;
   }
   
   export interface Participant {
-    zetaAddress: string;
-    chainId: number;
-    externalAddress: string;
+    userAddress: string;
     ticketCount: number;
   }
   

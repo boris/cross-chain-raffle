@@ -45,7 +45,7 @@ async function main() {
       // Try to get contract constants
       const ticketPrice = await raffle.TICKET_PRICE().catch(() => null);
       if (ticketPrice) {
-        console.log(`TICKET_PRICE: ${ethers.formatEther(ticketPrice)} tokens`);
+        console.log(`TICKET_PRICE: ${ethers.formatEther(ticketPrice)} ZETA`);
       }
       
       const owner = await raffle.owner().catch(() => null);
@@ -58,12 +58,12 @@ async function main() {
         console.log(`Pyth Entropy: ${pythAddress}`);
       }
       
-      const zetaConnector = await raffle.zetaConnectorAddress().catch(() => null);
-      if (zetaConnector) {
-        console.log(`Zeta Connector: ${zetaConnector}`);
+      const zetaToken = await raffle.zetaToken().catch(() => null);
+      if (zetaToken) {
+        console.log(`ZETA Token: ${zetaToken}`);
       }
       
-      if (ticketPrice && owner && pythAddress && zetaConnector) {
+      if (ticketPrice && owner && pythAddress && zetaToken) {
         console.log("This is confirmed to be a ZetaRaffle contract with expected interfaces.");
       } else {
         console.log("Some ZetaRaffle functions are not available - might be a different version or contract.");

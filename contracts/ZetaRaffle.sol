@@ -174,6 +174,9 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
             if (raffle.totalTickets + ticketCount == raffle.maxTickets) {
                 raffle.state = RaffleState.FINISHED;
                 emit RaffleStateChanged(raffleId, RaffleState.FINISHED);
+                
+                // Automatically initiate the drawing if all tickets are sold
+                _initiateDrawing(raffleId);
             }
         }
         
@@ -206,26 +209,20 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
         raffleCanBeDrawn(raffleId) 
         onlyOwner
     {
-        RaffleInfo storage raffle = raffles[raffleId];
-        
-        // Ensure we're not already requesting entropy or if it's been too long since last request
-        if (raffle.lastEntropyRequestTime > 0) {
-            require(
-                block.timestamp > raffle.lastEntropyRequestTime + ENTROPY_REQUEST_TIMEOUT,
-                "Previous entropy request still pending"
-            );
-        }
-        
-        // Request randomness from Pyth Entropy
-        uint64 nonce = uint64(uint256(keccak256(abi.encodePacked(block.timestamp, raffleId, _raffleIdCounter))));
-        randomnessRequests[raffleId] = nonce;
-        raffle.entropyNonce = nonce;
-        raffle.lastEntropyRequestTime = block.timestamp;
-        
-        IPythEntropy entropy = IPythEntropy(pythEntropyAddress);
-        entropy.generateRandomNumber(nonce);
-        
-        emit EntropyRequested(raffleId, nonce);
+        _initiateDrawing(raffleId);
+    }
+    
+    /**
+     * @dev Allow anyone to draw a winner for a raffle if it's in FINISHED state
+     * @param raffleId Raffle ID
+     */
+    function autoDrawWinner(uint256 raffleId) 
+        external 
+        raffleExists(raffleId) 
+        raffleCanBeDrawn(raffleId)
+        onlyOwner
+    {
+        _initiateDrawing(raffleId);
     }
     
     /**
@@ -262,7 +259,7 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
      */
     function claimPrize(uint256 raffleId) 
         external 
-        raffleExists(raffleId) 
+        raffleExists(raffleId)
         onlyOwner
         nonReentrant
     {
@@ -343,6 +340,33 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
             winnerAddress,
             raffle.prizePool
         );
+    }
+    
+    /**
+     * @dev Internal function to initiate the drawing process
+     * @param raffleId Raffle ID
+     */
+    function _initiateDrawing(uint256 raffleId) internal {
+        RaffleInfo storage raffle = raffles[raffleId];
+        
+        // Ensure we're not already requesting entropy or if it's been too long since last request
+        if (raffle.lastEntropyRequestTime > 0) {
+            require(
+                block.timestamp > raffle.lastEntropyRequestTime + ENTROPY_REQUEST_TIMEOUT,
+                "Previous entropy request still pending"
+            );
+        }
+        
+        // Request randomness from Pyth Entropy
+        uint64 nonce = uint64(uint256(keccak256(abi.encodePacked(block.timestamp, raffleId, _raffleIdCounter))));
+        randomnessRequests[raffleId] = nonce;
+        raffle.entropyNonce = nonce;
+        raffle.lastEntropyRequestTime = block.timestamp;
+        
+        IPythEntropy entropy = IPythEntropy(pythEntropyAddress);
+        entropy.generateRandomNumber(nonce);
+        
+        emit EntropyRequested(raffleId, nonce);
     }
     
     // View functions

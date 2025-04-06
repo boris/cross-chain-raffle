@@ -363,16 +363,35 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
             );
         }
         
-        // Request randomness from Pyth Entropy
+        // Generate nonce for randomness
         uint64 nonce = uint64(uint256(keccak256(abi.encodePacked(block.timestamp, raffleId, _raffleIdCounter))));
         randomnessRequests[raffleId] = nonce;
         raffle.entropyNonce = nonce;
         raffle.lastEntropyRequestTime = block.timestamp;
         
+        // Use try-catch to handle potential errors in the external call
         IPythEntropy entropy = IPythEntropy(pythEntropyAddress);
-        entropy.generateRandomNumber(nonce);
         
-        emit EntropyRequested(raffleId, nonce);
+        try entropy.generateRandomNumber(nonce) {
+            // Request successful
+            emit EntropyRequested(raffleId, nonce);
+        } catch Error(string memory reason) {
+            // Revert with reason string
+            revert(string(abi.encodePacked("Entropy request failed: ", reason)));
+        } catch (bytes memory /*lowLevelData*/) {
+            // Fallback to a simple deterministic randomness if Pyth is unavailable
+            // This is less secure but allows the raffle to complete
+            uint256 pseudoRandomness = uint256(keccak256(abi.encodePacked(
+                blockhash(block.number - 1),
+                block.timestamp,
+                block.prevrandao,
+                raffleId,
+                raffle.totalTickets
+            )));
+            
+            // Directly select winner using pseudo-randomness
+            _selectWinner(raffleId, pseudoRandomness);
+        }
     }
     
     // View functions

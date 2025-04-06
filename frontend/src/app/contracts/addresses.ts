@@ -18,7 +18,7 @@ export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalCha
   // ZetaChain testnet
   7001: {
     // Boris: Needs to be updated if the contract is deployed again
-    ZetaRaffle: '0x14b31eAae6aC71Cef68430b199850b8cf4d84152', // Updated contract with maxParticipants parameter
+    ZetaRaffle: '0xe4545008ca52E0cd2cFE751c6d53F4a384a41Cc7', // Updated contract with maxParticipants parameter
     // ZRC20 tokens
     ZRC20Tokens: {
       97: '0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7', // BSC ZRC20

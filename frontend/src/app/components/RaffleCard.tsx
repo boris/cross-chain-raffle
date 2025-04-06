@@ -53,13 +53,13 @@ export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
   // Get status badge
   const getBadge = () => {
     switch (raffle.state) {
-      case RaffleState.OPEN:
+      case RaffleState.ACTIVE:
         return isEnded 
-          ? <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded">Ready to Draw</span>
-          : <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Open</span>;
-      case RaffleState.DRAWING:
-        return <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Drawing...</span>;
-      case RaffleState.COMPLETE:
+          ? <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded">Ending Soon</span>
+          : <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Active</span>;
+      case RaffleState.FINISHED:
+        return <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Drawing Winner...</span>;
+      case RaffleState.COMPLETED:
         return <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">Completed</span>;
       default:
         return null;
@@ -91,38 +91,66 @@ export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
     }
   };
 
-  // Get action button
+  // Get action button based on raffle state and user role
   const getActionButton = () => {
+    // If user is not connected, show connect button
     if (!userAddress) {
-      return null; // No wallet connected
-    }
-
-    if (raffle.state === RaffleState.OPEN && !isEnded) {
       return (
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg w-full"
-        >
-          Buy Tickets
+        <button className="w-full bg-gray-500 text-white py-2 rounded hover:bg-gray-600 transition" disabled>
+          Connect Wallet
         </button>
       );
     }
 
-    if (raffle.state === RaffleState.COMPLETE && raffle.winner.toLowerCase() === userAddress.toLowerCase()) {
+    // If raffle is completed and user is the winner
+    if (raffle.state === RaffleState.COMPLETED && raffle.winner && raffle.winner.toLowerCase() === userAddress.toLowerCase()) {
+      if (Number(raffle.prizePool) === 0) {
+        return (
+          <button className="w-full bg-green-500 text-white py-2 rounded opacity-50 cursor-not-allowed" disabled>
+            Prize Claimed
+          </button>
+        );
+      }
+      
       return (
-        <button
-          onClick={handleClaimPrize}
+        <button 
+          onClick={handleClaimPrize} 
           disabled={isClaiming}
-          className={`${
-            isClaiming ? 'bg-green-400' : 'bg-green-600 hover:bg-green-700'
-          } text-white font-bold py-2 px-4 rounded-lg w-full`}
+          className={`w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 transition ${isClaiming ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isClaiming ? 'Claiming...' : 'Claim Prize'}
         </button>
       );
     }
 
-    return null;
+    // If raffle is active, show buy tickets button
+    if (raffle.state === RaffleState.ACTIVE && !isEnded) {
+      // Check if all tickets are sold (maxTickets > 0 indicates max tickets is set)
+      if (raffle.maxTickets > 0 && raffle.totalTickets >= raffle.maxTickets) {
+        return (
+          <button className="w-full bg-gray-500 text-white py-2 rounded opacity-50 cursor-not-allowed" disabled>
+            Sold Out
+          </button>
+        );
+      }
+      
+      return (
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="w-full bg-indigo-500 text-white py-2 rounded hover:bg-indigo-600 transition"
+        >
+          Buy Tickets
+        </button>
+      );
+    }
+    
+    // For all other states, show status
+    return (
+      <button className="w-full bg-gray-500 text-white py-2 rounded opacity-50 cursor-not-allowed" disabled>
+        {raffle.state === RaffleState.ACTIVE && isEnded ? 'Waiting for Draw' : 
+         raffle.state === RaffleState.FINISHED ? 'Drawing Winner' : 'Completed'}
+      </button>
+    );
   };
 
   return (
@@ -158,7 +186,7 @@ export function RaffleCard({ raffle, userAddress, onUpdate }: RaffleCardProps) {
             <span className="font-medium">{timeRemaining}</span>
           </div>
           
-          {raffle.state === RaffleState.COMPLETE && (
+          {raffle.state === RaffleState.COMPLETED && (
             <div className="flex justify-between">
               <span className="text-gray-500 text-sm">Winner:</span>
               <span className="font-medium truncate ml-2 w-24">

@@ -90,9 +90,15 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
     }
     
     modifier raffleCanBeDrawn(uint256 raffleId) {
-        require(raffles[raffleId].state == RaffleState.FINISHED, "Raffle not finished");
-        require(block.timestamp >= raffles[raffleId].endTime, "Raffle not ended yet");
-        require(raffles[raffleId].totalTickets >= MIN_PARTICIPANTS, "Not enough participants");
+        RaffleInfo storage raffle = raffles[raffleId];
+        require(raffle.state == RaffleState.FINISHED, "Raffle not finished");
+        
+        // Allow drawing if end time has passed OR all tickets have been sold (for raffles with max tickets)
+        bool timeExpired = block.timestamp >= raffle.endTime;
+        bool soldOut = raffle.maxTickets > 0 && raffle.totalTickets == raffle.maxTickets;
+        
+        require(timeExpired || soldOut, "Raffle not ended yet");
+        require(raffle.totalTickets >= MIN_PARTICIPANTS, "Not enough participants");
         _;
     }
     
@@ -175,8 +181,8 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
                 raffle.state = RaffleState.FINISHED;
                 emit RaffleStateChanged(raffleId, RaffleState.FINISHED);
                 
-                // Automatically initiate the drawing if all tickets are sold
-                _initiateDrawing(raffleId);
+                // Defer the drawing to a separate transaction to avoid reversion
+                // The owner can call autoDrawWinner, or anyone can call it if we make it permissionless
             }
         }
         

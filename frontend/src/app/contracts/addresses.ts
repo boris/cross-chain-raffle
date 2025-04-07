@@ -1,5 +1,5 @@
 // Define types for our contract addresses
-type ChainId = 7001 | 11155111 | 97;
+type ChainId = 7001 | 7000 | 11155111 | 97;
 
 type ZetaChainContracts = {
   ZetaRaffle: string;
@@ -17,13 +17,18 @@ type ExternalChainContracts = {
 export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalChainContracts> = {
   // ZetaChain testnet
   7001: {
-    // Boris: Needs to be updated if the contract is deployed again
-    ZetaRaffle: '0x7C34C25bFf617f78B7366913d750E2Bc502f7ae6', // Updated contract with maxParticipants parameter
+    // Updated to the latest deployed contract address
+    ZetaRaffle: '0xc7d1a7046793df508bc9db1cb9ac3b94e105eda9', // Latest deployed contract
     // ZRC20 tokens
     ZRC20Tokens: {
-      97: '0x7c8dDa80bbBE1254a7aACf3219EBe1481c6E01d7', // BSC ZRC20
-      11155111: '0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0', // Sepolia ZRC20
+      97: '0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0', // BSC ZRC20
+      11155111: '0x0cbe0dF132a6c6B4a2974Fa1b7Fb953CF0Cc798a', // Sepolia ZRC20
     }
+  },
+  // ZetaChain mainnet
+  7000: {
+    ZetaRaffle: '0x05e0A79C22d08394481d0B673ba94f7b0D69BA9D', // Latest deployed contract
+    ZRC20Tokens: {}  // Empty object for now, add tokens when needed
   },
   // Ethereum Sepolia testnet
   11155111: {
@@ -39,12 +44,14 @@ export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalCha
 
 export const nativeTokenSymbols: Record<ChainId, string> = {
   7001: 'ZETA',
+  7000: 'ZETA',
   11155111: 'ETH',
   97: 'BNB'
 };
 
 export const chainNames: Record<ChainId, string> = {
   7001: 'ZetaChain Testnet',
+  7000: 'ZetaChain Mainnet',
   11155111: 'Ethereum Sepolia',
   97: 'BSC Testnet'
 };
@@ -52,6 +59,8 @@ export const chainNames: Record<ChainId, string> = {
 export const getChainColor = (chainId: number): string => {
   switch (chainId) {
     case 7001:
+      return '#6259CA'; // ZetaChain purple
+    case 7000:
       return '#6259CA'; // ZetaChain purple
     case 11155111:
       return '#627EEA'; // Ethereum blue
@@ -66,7 +75,7 @@ export const getChainColor = (chainId: number): string => {
 
 // Helper function to type-safely access the contracts for a specific chain
 export function getZetaChainContracts(): ZetaChainContracts {
-  return contractAddresses[7001] as ZetaChainContracts;
+  return contractAddresses[7000] as ZetaChainContracts;
 }
 
 export function getExternalChainContracts(chainId: 11155111 | 97): ExternalChainContracts {

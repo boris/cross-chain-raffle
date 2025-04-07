@@ -19,10 +19,28 @@ export const zetachainAthens: Chain = {
   testnet: true,
 };
 
+export const zetachainMainnet: Chain = {
+  id: 7000,
+  name: 'ZetaChain Mainnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'ZETA',
+    symbol: 'ZETA',
+  },
+  rpcUrls: {
+    public: { http: ['https://zetachain-evm.blockpi.network/v1/rpc/public'] },
+    default: { http: ['https://zetachain-evm.blockpi.network/v1/rpc/public'] },
+  },
+  blockExplorers: {
+    default: { name: 'ZetaScan', url: 'https://explorer.zetachain.com' },
+  },
+  testnet: false,
+};
+
 // App config
 export const appConfig = {
   appName: 'ZetaRaffle',
-  mainChain: zetachainAthens,
+  mainChain: zetachainMainnet,
   ticketPrice: "0.1", // 0.1 ZETA in wei
 };
 
@@ -34,6 +52,7 @@ export const defaultProviderOptions = {
 
 // Chain configurations
 export const supportedChains = [
+  zetachainMainnet,
   zetachainAthens,
   {
     id: 11155111,

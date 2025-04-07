@@ -278,7 +278,11 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
         uint256 operatorFee = (raffle.prizePool * OPERATOR_FEE_PERCENTAGE) / 100;
         uint256 prizeAmount = raffle.prizePool - operatorFee;
         
-        // Reset prize pool
+        // Important: Save values before resetting state
+        address winner = raffle.winner;
+        uint256 savedPrizeAmount = prizeAmount;
+        
+        // Reset prize pool before transfer to prevent reentrancy
         raffle.prizePool = 0;
         
         // Send operator fee to owner
@@ -286,10 +290,16 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
         require(feeSuccess, "Fee transfer failed");
         
         // Send prize to winner
-        (bool prizeSuccess, ) = payable(raffle.winner).call{value: prizeAmount}("");
-        require(prizeSuccess, "Prize transfer failed");
+        (bool prizeSuccess, ) = payable(winner).call{value: savedPrizeAmount}("");
         
-        emit PrizeClaimed(raffleId, raffle.winner, prizeAmount);
+        // If prize transfer fails, revert transaction and restore state
+        if (!prizeSuccess) {
+            raffle.prizePool = savedPrizeAmount + operatorFee; // Restore original prize pool
+            revert("Prize transfer failed");
+        }
+        
+        // Emit successful prize claim event
+        emit PrizeClaimed(raffleId, winner, savedPrizeAmount);
     }
     
     // Internal functions

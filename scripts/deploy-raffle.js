@@ -9,13 +9,15 @@ async function main() {
   const chainId = network.chainId;
   console.log(`Deploying to chain ID: ${chainId}`);
 
+  /*
   if (chainId !== 7001n) {
     console.error("This script is intended to be used only on ZetaChain testnet (chainId 7001)");
     return;
   }
+  */
 
   // ZetaChain testnet addresses - let ethers handle the checksums
-  const pythEntropyAddress = ethers.getAddress("0x4374e5a8b9C22271E9EB878A2AA31DE97DF15DAF");   // pyth entropy address for testnet
+  const pythEntropyAddress = ethers.getAddress("0x36825bf3Fbdf5a29E2d5148bfe7Dcf7B5639e320");   // pyth entropy address for testnet
   const zetaTokenAddress = ethers.getAddress("0x5F0b1a82749cb4E2278EC87F8BF6B618dC71a8bf");     // ZETA token on testnet
   
   // Deploy ZetaRaffle contract

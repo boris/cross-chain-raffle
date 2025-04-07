@@ -26,6 +26,16 @@ module.exports = {
       timeout: 60000,
       ens: false  // Boris: Disable ENS resolution
     },
+    // ZetaChain mainnet
+    "zetachain-mainnet": {
+      url: "https://zetachain-evm.blockpi.network/v1/rpc/public",
+      accounts: [PRIVATE_KEY],
+      chainId: 7000,
+      gasPrice: "auto",
+      gas: "auto",
+      timeout: 60000,
+      ens: false  // Boris: Disable ENS resolution
+    },
     // Boris: Are networks below really required?
     // Ethereum Sepolia testnet
     "sepolia": {

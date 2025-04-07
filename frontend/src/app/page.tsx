@@ -55,12 +55,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Debug indicator */}
-        <div className="bg-gray-100 p-2 mb-4 text-sm">
-          Debug: Wallet {isConnected ? 'Connected' : 'Disconnected'} | 
-          Address: {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'None'}
-        </div>
-
         {isConnected ? (
           <RaffleList userAddress={walletAddress} />
         ) : (

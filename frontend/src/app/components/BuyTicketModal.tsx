@@ -84,7 +84,7 @@ export function BuyTicketModal({ raffle, onClose, onSuccess }: BuyTicketModalPro
           BigInt(raffle.raffleId),
           BigInt(ticketCount)
         ],
-        value: totalPrice,
+        value: totalPrice, // Make sure this is calculated correctly
       });
       
       setSuccess(true);

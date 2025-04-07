@@ -18,7 +18,7 @@ export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalCha
   // ZetaChain testnet
   7001: {
     // Updated to the latest deployed contract address
-    ZetaRaffle: '0xc7d1a7046793df508bc9db1cb9ac3b94e105eda9', // Latest deployed contract
+    ZetaRaffle: '0x94002C17E3e593EAdF6d59983f531aC3dF4a11dF', // Latest deployed contract
     // ZRC20 tokens
     ZRC20Tokens: {
       97: '0x05BA149A7bd6dC1F937fA9046A9e05C05f3b18b0', // BSC ZRC20
@@ -27,7 +27,7 @@ export const contractAddresses: Record<ChainId, ZetaChainContracts | ExternalCha
   },
   // ZetaChain mainnet
   7000: {
-    ZetaRaffle: '0x05e0A79C22d08394481d0B673ba94f7b0D69BA9D', // Latest deployed contract
+    ZetaRaffle: '0x719f1fb30CfD5DF5eA312035E182A11c596A6e53', // Latest deployed contract
     ZRC20Tokens: {}  // Empty object for now, add tokens when needed
   },
   // Ethereum Sepolia testnet

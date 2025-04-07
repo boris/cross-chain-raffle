@@ -40,7 +40,7 @@ export const zetachainMainnet: Chain = {
 // App config
 export const appConfig = {
   appName: 'ZetaRaffle',
-  mainChain: zetachainMainnet,
+  mainChain: zetachainMainnet, // To switch between testnet and mainnet, change this line to zetachainAthens or zetachainMainnet
   ticketPrice: "0.1", // 0.1 ZETA in wei
 };
 

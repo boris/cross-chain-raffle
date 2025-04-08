@@ -264,46 +264,46 @@ contract ZetaRaffle is Ownable, ReentrancyGuard {
      * @param raffleId Raffle ID
      */
     function claimPrize(uint256 raffleId) 
-    external 
-    raffleExists(raffleId)
-    onlyOwner
-    nonReentrant
-{
-    RaffleInfo storage raffle = raffles[raffleId];
-    require(raffle.state == RaffleState.COMPLETED, "Raffle not completed");
-    require(raffle.winner != address(0), "No winner selected");
-    require(raffle.prizePool > 0, "Prize already claimed");
-    
-    // Calculate prize amount (minus operator fee)
-    uint256 operatorFee = (raffle.prizePool * OPERATOR_FEE_PERCENTAGE) / 100;
-    uint256 prizeAmount = raffle.prizePool - operatorFee;
-    
-    // Important: Check contract balance before attempting transfers
-    require(address(this).balance >= raffle.prizePool, "Insufficient contract balance");
-    
-    // Important: Save values before resetting state
-    address winner = raffle.winner;
-    uint256 savedPrizeAmount = prizeAmount;
-    
-    // Reset prize pool before transfer to prevent reentrancy
-    raffle.prizePool = 0;
-    
-    // Send operator fee to owner
-    (bool feeSuccess, ) = payable(owner()).call{value: operatorFee}("");
-    require(feeSuccess, "Fee transfer failed");
-    
-    // Send prize to winner
-    (bool prizeSuccess, ) = payable(winner).call{value: savedPrizeAmount}("");
-    
-    // If prize transfer fails, revert transaction and restore state
-    if (!prizeSuccess) {
-        raffle.prizePool = savedPrizeAmount + operatorFee; // Restore original prize pool
-        revert("Prize transfer failed");
+        external 
+        raffleExists(raffleId)
+        onlyOwner
+        nonReentrant
+    {
+        RaffleInfo storage raffle = raffles[raffleId];
+        require(raffle.state == RaffleState.COMPLETED, "Raffle not completed");
+        require(raffle.winner != address(0), "No winner selected");
+        require(raffle.prizePool > 0, "Prize already claimed");
+        
+        // Calculate prize amount (minus operator fee)
+        uint256 operatorFee = (raffle.prizePool * OPERATOR_FEE_PERCENTAGE) / 100;
+        uint256 prizeAmount = raffle.prizePool - operatorFee;
+        
+        // Important: Check contract balance before attempting transfers
+        require(address(this).balance >= raffle.prizePool, "Insufficient contract balance");
+        
+        // Important: Save values before resetting state
+        address winner = raffle.winner;
+        uint256 savedPrizeAmount = prizeAmount;
+        
+        // Reset prize pool before transfer to prevent reentrancy
+        raffle.prizePool = 0;
+        
+        // Send operator fee to owner
+        (bool feeSuccess, ) = payable(owner()).call{value: operatorFee}("");
+        require(feeSuccess, "Fee transfer failed");
+        
+        // Send prize to winner
+        (bool prizeSuccess, ) = payable(winner).call{value: savedPrizeAmount}("");
+        
+        // If prize transfer fails, revert transaction and restore state
+        if (!prizeSuccess) {
+            raffle.prizePool = savedPrizeAmount + operatorFee; // Restore original prize pool
+            revert("Prize transfer failed");
+        }
+        
+        // Emit successful prize claim event
+        emit PrizeClaimed(raffleId, winner, savedPrizeAmount);
     }
-    
-    // Emit successful prize claim event
-    emit PrizeClaimed(raffleId, winner, savedPrizeAmount);
-}
     
     // Internal functions
     
